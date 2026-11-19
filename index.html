@@ -1,0 +1,2992 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Motor Controller</title><script src="dfu.js"></script><script src="dfuse.js"></script>
+<style>
+*{box-sizing:border-box}
+body{font-family:-apple-system,"Segoe UI",sans-serif;margin:0;display:flex;height:100vh;background:hsla(120,5%,52%,.555);color:#1e2530}
+[hidden]{display:none!important}
+button{font-family:inherit}
+.sidebar{width:230px;background:#052202;color:#e0eefc;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.sidebar-header{padding:18px 16px;border-bottom:1px solid #72856e}
+.sidebar-header h1{font-size:16px;margin:0 0 12px;color:rgb(230,228,250)}
+.connect-toggle{width:100%;padding:9px;border-radius:6px;border:1px solid #2a3240;background:#2a3240;color:#cfd6e0;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px}
+.connect-toggle::before{content:"";width:10px;height:10px;border-radius:100%;background:#ec0c0c;flex-shrink:0}
+.connect-toggle.connected{color:#fff;font-weight:600}
+.connect-toggle.connected::before{background:green}
+.connect-toggle:disabled,.stop:disabled{opacity:.5;cursor:not-allowed}
+.board-toggle{display:flex;gap:6px;margin-top:10px}
+.board-toggle span{flex:1;padding:7px;border-radius:6px;border:1px solid #2a3240;background:transparent;color:#8b95a3;font-size:12px;text-align:center;cursor:default;user-select:none;pointer-events:none}
+.board-toggle span[aria-pressed=false]{display:none}
+.board-toggle span[aria-pressed=true]{background:#010131;border-color:#e6c406;color:rgb(204,253,208);font-weight:600}
+.stop{width:100%;margin-top:10px;padding:9px;border-radius:6px;border:1px solid #c0392b;background:#c0392b;color:#fff;font-size:13px;cursor:pointer}
+.sidebar-status{padding:10px 16px;font-size:12px;color:#cfd6e0;border-bottom:1px solid #72856e}
+.srow{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px}
+.srow span:last-child{text-align:right}
+.sflag{font-weight:700;color:#8fd18f}.sflag.active{color:#ff6b6b}.sflag.fault{color:#e6c406}
+.nav button{display:block;width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;border-bottom:1px solid #72856e;padding:12px 16px;color:#e0eefc;font-size:14px;cursor:pointer}
+.nav button:hover{background:#2a3240}
+.nav button.active{background:#010131;border-left-color:#e6c406;border-bottom-color:transparent;color:rgb(204,253,208);font-weight:600}
+.app{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.workspace{flex:1;overflow-y:auto;padding:28px 36px}
+.page-title{margin:0 0 20px;padding-bottom:12px;border-bottom:3px solid #052202}
+.page-title h1{margin:0;font-size:1.5em;font-weight:700;color:#1e2530}
+.notice{background:#f5faf4;border:1px solid #72856e;border-radius:6px;padding:10px 14px;font-size:13px;color:#333;margin-bottom:16px}
+#panels{display:grid;grid-template-columns:minmax(0,1fr);gap:22px;align-items:start}
+#panels.dual{grid-template-columns:repeat(2,minmax(0,1fr))}
+.motor-card{min-width:0}
+#panels:not(.dual) .motor-heading,#panels:not(.dual) .motor-readout,#panels:not(.dual) .fault-readout{display:none}
+#panels.dual .motor-card{border:1px solid #72856e;border-radius:8px;overflow:hidden}
+#panels.dual .motor-content{padding:16px}
+.motor-heading{display:flex;align-items:center;gap:11px;background:#052202;color:#fff;padding:9px 16px}
+.motor-heading h2{margin:0;font-size:13px;font-weight:700}
+.motor-readout{display:flex;align-items:center;gap:22px;padding:12px 16px;border-bottom:1px solid #72856e}
+.motor-readout>div>span{display:block;font-size:10px;letter-spacing:1px;color:#333;font-weight:700;margin-bottom:4px}
+.motor-readout strong{font-size:22px;color:#052202}
+.motor-readout small{font-size:11px;color:#333;margin-left:4px}
+.motor-actions{margin-left:auto;display:flex;gap:6px}
+.motor-actions button{padding:8px 14px;border-radius:6px;font-size:13px;cursor:pointer}
+.subtle{background:#f5faf4;border:1px solid #052202;color:#052202}
+.motor-actions button:disabled{opacity:.5;cursor:not-allowed}
+.fault-readout{padding:8px 16px;background:#fdecea;color:#7a1f14;font-size:12px}
+.motor-content{container-type:inline-size;min-width:0}
+#panels.board-wide{grid-template-columns:1fr}
+#panels.board-wide .motor-card[data-motor="2"]{display:none}
+#panels.board-wide .motor-heading,#panels.board-wide .motor-readout{display:none}
+.board-choices{display:grid;grid-template-columns:repeat(2,minmax(0,230px));gap:14px;justify-content:start}
+.board-choice{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;background:#f5faf4;border:1.5px solid #72856e;border-radius:10px;padding:14px 16px;text-align:left;color:#1e2530;cursor:pointer;transition:border-color .12s,box-shadow .12s,transform .12s}
+.board-choice:hover{border-color:#052202;transform:translateY(-1px);box-shadow:0 4px 10px rgba(5,34,2,.2)}
+.board-choice:focus-visible{outline:3px solid #052202;outline-offset:2px}
+.board-choice[aria-pressed=true]{border-color:#052202;border-width:2px;padding:13.5px 15.5px;background:#eaf3e8}
+.board-choice b{font-size:15px;color:#052202}
+.board-choice small{font-size:12px;color:#555;line-height:1.4}
+.board-note{margin-top:16px;color:#333;font-size:12.5px}
+
+#dualHome{display:flex;flex-direction:column;gap:20px}
+.dh-hero{background:#052202;color:#fff;border-radius:10px;padding:22px 26px}
+.dh-hero h1{margin:0 0 6px;font-size:1.6em;color:rgb(230,228,250)}
+.dh-hero p{margin:0;font-size:13.5px;color:#cfd6e0;line-height:1.5;max-width:640px}
+.dh-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.dh-tile{background:#f5faf4;border:1px solid #72856e;border-radius:8px;padding:12px 14px}
+.dh-tile span{display:block;font-size:10px;font-weight:700;letter-spacing:1px;color:#555;text-transform:uppercase;margin-bottom:4px}
+.dh-tile strong{font-size:16px;color:#052202}
+.dh-tile strong.active{color:#c0392b}.dh-tile strong.fault{color:#a06f00}
+.dh-motors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.dh-motor{background:#f5faf4;border:1px solid #72856e;border-radius:10px;overflow:hidden}
+.dh-motor h2{margin:0;padding:9px 16px;background:#052202;color:#fff;font-size:13px}
+.dh-body{display:flex;align-items:flex-end;gap:26px;padding:16px;flex-wrap:wrap}
+.dh-body>div>span{display:block;font-size:10px;font-weight:700;letter-spacing:1px;color:#333;margin-bottom:4px}
+.dh-body strong{font-size:28px;color:#052202}
+.dh-body small{font-size:11px;color:#333;margin-left:4px}
+.dh-actions{margin-left:auto;display:flex;gap:6px}
+.dh-actions button{padding:8px 14px;border-radius:6px;font-size:13px;cursor:pointer}
+.dh-actions button:disabled{opacity:.5;cursor:not-allowed}
+.dh-fault{padding:8px 16px;background:#fdecea;color:#7a1f14;font-size:12px}
+.dh-title{margin:4px 0 -8px;font-size:12px;font-weight:700;letter-spacing:1px;color:#052202;text-transform:uppercase}
+.dh-links{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.dh-link{display:flex;gap:12px;align-items:flex-start;text-align:left;background:#f5faf4;border:1px solid #72856e;border-radius:10px;padding:13px 14px;cursor:pointer;color:#1e2530}
+.dh-link:hover{border-color:#052202;box-shadow:0 3px 9px rgba(5,34,2,.18);transform:translateY(-1px)}
+.dh-link b{display:block;font-size:14px;margin-bottom:2px}
+.dh-link small{font-size:12px;color:#555;line-height:1.35}
+@media(max-width:1100px){.dh-motors{grid-template-columns:1fr}.dh-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1350px){.dh-links{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.dh-links{grid-template-columns:1fr}}
+@media(max-width:1100px){#panels.dual{grid-template-columns:1fr}}
+@media(max-width:900px){.workspace{padding:18px}}
+@media(max-width:600px){body{height:auto;min-height:100vh}.sidebar{width:165px}.workspace{padding:12px}.board-choices{grid-template-columns:1fr}}
+</style></head><body>
+<aside class="sidebar">
+<div class="sidebar-header"><h1>Motor Controller</h1>
+<button class="connect-toggle" id="connect">Connect USB</button>
+<div class="board-toggle" role="status" aria-label="Selected board type (change it on the Board page)"><span id="single" aria-pressed="true">Single motor</span><span id="dual" aria-pressed="false">Dual motor</span></div>
+<button class="stop" id="stop" disabled>■ &nbsp;Stop all</button></div>
+<div class="sidebar-status">
+<div class="srow"><span>Connection</span><span id="status">Disconnected</span></div>
+<div class="srow"><span>Firmware</span><span id="shellVersion">-</span></div>
+<div class="srow"><span>Active</span><span class="sflag" id="shellActive">NO</span></div>
+<div class="srow"><span>Fault</span><span class="sflag" id="shellFault">none</span></div>
+</div>
+<nav class="nav" aria-label="Motor Controller">
+<button data-page="home" class="active">Home</button>
+<button data-page="boards">Board</button>
+<button data-page="firmware">Firmware Update</button>
+<button data-page="can">CAN</button>
+<button data-page="motorsetup">Motor Setup</button>
+<button data-page="tuning">Tuning</button>
+<button data-page="sensors">Sensors</button>
+<button data-page="testing">Testing</button>
+<button data-page="blackbox">Blackbox</button>
+<button data-page="backup">Backup / Restore</button>
+<button data-page="cli">CLI</button>
+</nav>
+<div hidden><span id="connectionDot"></span><span id="crumb"></span><span id="eyebrow"></span><span id="pageSubtitle"></span></div>
+</aside>
+<main class="app"><div class="workspace">
+<div class="page-title" id="pageTitleBar"><h1 id="pageTitle">Home</h1></div>
+<div class="notice" role="status" hidden><span id="message"></span></div>
+<div id="boardSelection" hidden><div class="board-choices"><button class="board-choice" id="chooseSingle" aria-pressed="true"><b>Single motor</b><small>One motor, one set of controls</small></button><button class="board-choice" id="chooseDual" aria-pressed="false"><b>Dual motor</b><small>Two motors, one USB connection</small></button></div><p class="board-note">Select the board type, then connect USB. The connected firmware is checked before motor commands are enabled.</p></div>
+<section id="dualHome" hidden>
+<div class="dh-hero"><h1>Dual Motor Controller</h1><p></p></div>
+<div class="dh-summary"><div class="dh-tile"><span>Board</span><strong>Dual motor</strong></div><div class="dh-tile"><span>Firmware</span><strong id="dhFirmware">-</strong></div><div class="dh-tile"><span>Active</span><strong id="dhActive">NO</strong></div><div class="dh-tile"><span>Fault</span><strong id="dhFault">none</strong></div></div>
+<div class="dh-motors"><div class="dh-motor"><h2>Motor 1</h2><div class="dh-body"><div><span>VELOCITY</span><strong id="hrpm-1">—</strong><small>RPM</small></div><div><span>POSITION</span><strong id="hpos-1">—</strong><small>deg</small></div><div class="dh-actions"><button id="hstop-1" class="subtle" disabled>Stop</button></div></div><div class="dh-fault" id="hfault-1" hidden></div></div><div class="dh-motor"><h2>Motor 2</h2><div class="dh-body"><div><span>VELOCITY</span><strong id="hrpm-2">—</strong><small>RPM</small></div><div><span>POSITION</span><strong id="hpos-2">—</strong><small>deg</small></div><div class="dh-actions"><button id="hstop-2" class="subtle" disabled>Stop</button></div></div><div class="dh-fault" id="hfault-2" hidden></div></div></div>
+<div class="dh-title">Workflow</div>
+<div class="dh-links"><button class="dh-link" data-goto="firmware"><span><b>Firmware Update</b><small>Flash new firmware via DFU</small></span></button><button class="dh-link" data-goto="motorsetup"><span><b>Motor Setup</b><small>Check motor and encoder direction</small></span></button><button class="dh-link" data-goto="tuning"><span><b>Tuning</b><small>Identify each motor and tune its controllers</small></span></button><button class="dh-link" data-goto="sensors"><span><b>Sensors</b><small>Measure and set encoder CPR</small></span></button><button class="dh-link" data-goto="testing"><span><b>Testing</b><small>Test velocity and position control</small></span></button><button class="dh-link" data-goto="blackbox"><span><b>Blackbox</b><small>Record and export telemetry</small></span></button><button class="dh-link" data-goto="backup"><span><b>Backup / Restore</b><small>Save or reload a full config</small></span></button><button class="dh-link" data-goto="cli"><span><b>CLI</b><small>Send raw commands to the board</small></span></button></div>
+</section>
+<div id="panels"></div></div></main>
+
+<template id="panelTemplate">
+<style>
+  * { box-sizing: border-box; }
+  .sidebar { width: 230px; background: #052202; color: #e0eefc; display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+  .sidebar-status { padding: 10px 16px; font-size: 12px; color: #cfd6e0; border-bottom: 1px solid #72856e; }
+  .sidebar-status .srow { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .sidebar-status .sflag { font-weight: 700; color: #8fd18f; }
+  .sidebar-status .sflag.active { color: #ff6b6b; }
+  .sidebar-status .sflag.fault { color: #e6c406; }
+
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .content { flex: 1; overflow-y: auto; padding: 28px 36px; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page h2 { margin: 0 0 20px; padding-bottom: 12px; border-bottom: 3px solid #052202; }
+  .hero h1 { padding-bottom: 12px; border-bottom: 3px solid #052202; }
+
+  .tab-config-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin:20px 0 4px; padding-top:12px; border-top:1px solid #72856e; }
+  .config-action-status { margin-right:auto; color:#333; font-size:13px; }
+
+  .box { margin-bottom: 16px; border-radius: 8px; overflow: hidden; border: 1px solid hsla(120, 5%, 52%, 0.555); }
+  .box-header { background: #052202; color: #fff; font-weight: 700; font-size: 13px; padding: 9px 16px; }
+  .box-body { padding: 16px; background: hsla(120, 5%, 52%, 0.555); }
+  label { display: inline-block; width: 120px; font-size: 13px; color: #444; }
+  input[type=number], input[type=text], select { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; width: 90px; }
+  input:focus, select:focus, button:focus-visible { outline: 3px solid #052202; outline-offset: 2px; }
+  select option:checked { background: #052202; color: #fff; }
+  #flashProgress { accent-color: #052202; }
+  #flashProgress::-webkit-progress-bar { background: #d7ddd7; border-radius: 4px; }
+  #flashProgress::-webkit-progress-value { background: #052202; border-radius: 4px; }
+  #flashProgress::-moz-progress-bar { background: #052202; border-radius: 4px; }
+  input[type=file] { width: 100%; margin-bottom: 8px; font-size: 12px; }
+  .row { margin-bottom: 10px; }
+  button.action {
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: 1px solid #052202;
+    background: #052202;
+    color: white;
+    cursor: pointer;
+    margin-right: 6px;
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+  }
+  button.action:active { transform: translateY(2px) scale(0.97); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); }
+  button.action.secondary { background:#f5faf4; color: #052202; }
+  button.action.apply-button { background: #052202; color: white; border-color: #052202; }
+  button.action.danger { background: #c0392b; border-color: #c0392b; }
+  button.action.full { width: 100%; text-align: center; margin-right: 0; }
+  button.action:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .motor-columns { display: flex; gap: 20px; align-items: flex-start; }
+  .motor-column { flex: 1; min-width: 0; }
+  .motor-column + .motor-column { border-left: 2px solid #052202; padding-left: 20px; }
+  .motor-column-header { font-weight: 700; font-size: 15px; margin-bottom: 10px; color: #1e2530; display: flex; align-items: center; gap: 8px; }
+
+  .dfu-note { background: #fff3cd; padding: 12px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
+  .warn-note { background: #fdecea; border: 1px solid #f1b3ac; color: #7a1f14; padding: 12px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
+  .hint-note { color: #555; font-size: 13px; max-width: 680px; margin: 0 0 18px; }
+  #page-can .can-columns { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; align-items:start; }
+  #page-can .can-columns > .box { min-width:0; margin:0; }
+  #page-can.active { display:flex; flex-direction:column; min-height:calc(100vh - 210px); }
+  #page-can .can-columns { margin-bottom:20px; }
+  #page-can .can-actions { margin-top:auto; }
+  #page-can .can-actions .can-state { margin-top:0; }
+  #page-can .box { overflow:visible; }
+  #page-can .box-header { border-radius:7px 7px 0 0; }
+  #page-can .box-body { border-radius:0 0 7px 7px; }
+  .dropdown-arrow { width:7px; height:7px; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor; transform:translateY(-2px) rotate(45deg); flex:0 0 7px; margin:0 3px 0 12px; }
+  .can-rate-button:disabled { opacity:.6; cursor:not-allowed; }
+  @media (max-width:760px) { #page-can .can-columns { grid-template-columns:1fr; } }
+  #page-can .can-grid { grid-template-columns: 1fr; max-width: none; }
+  #page-can .can-field + .can-field { margin-top: 16px; }
+  .can-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; max-width: 760px; }
+  .can-field label { display: block; width: auto; margin-bottom: 6px; }
+  .can-rate-picker { position: relative; width: 100%; }
+  .can-rate-button { width: 100%; min-height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 7px 9px; border: 1px solid #ccc; border-radius: 4px; background:#f5faf4; color: #222; text-align: left; cursor: pointer; }
+  .can-rate-button:hover { border-color: #052202; }
+  #motorDirectionPicker { width: max-content; flex: 0 0 auto; }
+  #motorDirectionButton { width: auto; gap: 10px; }
+  #motorDirectionLabel { min-width: 8ch; }
+
+  .can-rate-menu { position: absolute; z-index: 20; top: calc(100% + 3px); left: 0; right: 0; overflow: hidden; border: 1px solid #052202; border-radius: 5px; background:#f5faf4; box-shadow: 0 5px 14px rgba(0,0,0,.2); }
+  .can-rate-option { padding: 9px 10px; color: #222; cursor: pointer; }
+  .can-rate-option:hover, .can-rate-option:focus { outline: none; background: #e7eee7; color: #052202; }
+  .can-rate-option.selected { background: #dcebd8; color: #052202; }
+  .can-rate-option.selected:hover, .can-rate-option.selected:focus { background: #d2e5cd; color: #052202; }
+  .motor-direction-picker { position: relative; display: inline-block; width: 140px; vertical-align: middle; }
+  .motor-direction-picker .can-rate-menu { right: 0; }
+  .box:has(#motorDirectionPicker) { overflow: visible; }
+  .box:has(#motorDirectionPicker) .box-header { border-radius: 7px 7px 0 0; }
+  .box:has(#motorDirectionPicker) .box-body { border-radius: 0 0 7px 7px; }  .can-field select, .can-field input { width: 100%; }
+  .can-help { color: #555; font-size: 13px; line-height: 1.5; margin: 6px 0 0; }
+  .can-state { color: #444; font-size: 13px; margin-top: 12px; }
+  .can-state.error { color: #a3261a; font-weight: 600; }
+  .can-state.success { color: #176b36; font-weight: 600; }
+
+  table.data td, table.data th { padding: 4px 10px; text-align: left; border-bottom: 1px solid #eee; font-size: 12px; }
+  canvas { border: 1px solid #ddd; border-radius: 6px; width: 100%; height: 150px; display: block; margin-top: 8px; max-width: 100%; }
+  .board-option { display: inline-block; border: 2px solid #ddd; border-radius: 8px; padding: 16px 24px; margin-right: 12px; cursor: pointer; text-align: center; }
+  .board-option.selected { border-color: #052202; background: #eaf3fc; }
+
+  .hero { padding: 32px 0 8px; }
+  .hero p { color:#414b45; font-size: 14px; margin: 20px 0 28px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 32px; }
+  @media (max-width: 700px) { .stat-grid { grid-template-columns: 1fr 1fr; } }
+  .stat-card { background:#f5faf4; border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px; }
+  .stat-card .label { font-size: 12px; color:#414b45; margin-bottom: 6px; }
+  .stat-card .value { font-size: 18px; font-weight: 600; color: #1e2530; }
+  .quick-links { display: flex; gap: 12px; flex-wrap: wrap; }
+  .quick-link { flex: 1; min-width: 150px; background:#f5faf4; border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px; cursor: pointer; }
+  .quick-link:hover { border-color: #052202; background: #f7fbff; }
+  .quick-link .title { font-weight: 600; font-size: 14px; margin-bottom: 4px; color: #1e2530; }
+  .quick-link .desc { font-size: 12px; color:#414b45; }
+
+  .status-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .status-item { background:#f5faf4; border: 1px solid #ccc; border-radius: 8px; padding: 12px 16px; }
+  .status-item .slabel { font-size: 11px; color:#414b45; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px; }
+  .status-item .svalue { font-size: 16px; font-weight: 700; color: #1e2530; }
+
+  .cli-output { font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; background: #0d1117; color: #c9d1d9; padding: 12px; height: 360px; overflow-y: auto; border-radius: 6px; white-space: pre-wrap; }
+  .cli-output .tx { color: #79c0ff; }
+  .cli-output .rx { color: #7ee787; }
+  .cli-output .err { color: #ff7b72; }
+  .cli-input-row { display: flex; gap: 8px; margin-top: 10px; }
+  .cli-input-row input { flex: 1; width: auto; font-family: monospace; }
+
+  .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; align-items: center; justify-content: center; }
+  .modal-backdrop.open { display: flex; }
+  .modal-box { background:#f5faf4; border-radius: 10px; padding: 22px 24px; max-width: 420px; width: 90%; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+  .modal-box h3 { margin-top: 0; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+
+  #flashStatus.success { color: #1c8a3c; font-weight: 600; }
+  #flashStatus.error { color: #c0392b; font-weight: 600; }
+
+  .direction-result { margin-top: 14px; padding: 14px 16px; border-radius: 8px; background: #f5f6f7; border: 1px solid #ddd; }
+  .direction-result.ok { background: #eaf7ee; border-color: #9bd0aa; }
+  .direction-result.bad { background: #fdecea; border-color: #e7aaa2; }
+  .direction-status { font-size: 18px; font-weight: 700; }
+  .direction-values { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:12px; }
+  .direction-value { background:#f5faf4; border:1px solid #ddd; border-radius:7px; padding:10px; }
+  .direction-value .small { font-size:10px; color:#414b45; text-transform:uppercase; }
+  .direction-value .big { font-size:17px; font-weight:700; margin-top:3px; }
+  .encoder-test-intro { margin:0 0 12px; color:#4d5c4d; font-size:13px; line-height:1.45; }
+  .encoder-test-safety { margin:0 0 14px; padding:9px 11px; border:1px solid #e5d59a; border-radius:6px; background:#fff8dc; color:#65551b; font-size:12px; }
+  .encoder-test-controls { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:12px; border:1px solid #d8dfd8; border-radius:8px; background:#f5faf4; }
+  .encoder-test-controls label { width:auto; min-width:90px; font-weight:600; color:#334133; }
+  .encoder-test-controls input { width:100px; }
+  .encoder-test-actions { display:flex; flex-wrap:wrap; gap:8px; margin-left:auto; }
+  .encoder-test-actions .action { margin:0; }
+  .encoder-test-readouts { grid-template-columns:repeat(2,minmax(0,1fr)); margin:12px 0; }
+  .encoder-test-readouts .direction-value { padding:12px 14px; border-color:#d8dfd8; }
+  .encoder-test-readouts .small { letter-spacing:.04em; }
+  .encoder-test-readouts .big { font-size:21px; color:#172817; }
+  .encoder-test-lower { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; align-items:stretch; }
+  .encoder-test-lower .direction-result { margin:0; display:flex; flex-direction:column; justify-content:center; min-height:90px; }
+  .encoder-sign-panel { display:flex; flex-direction:column; justify-content:center; gap:12px; padding:12px; border:1px solid #d8dfd8; border-radius:8px; background:#f8fbf8; }
+  .encoder-sign-current { display:flex; align-items:center; justify-content:space-between; gap:10px; color:#586458; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+  .encoder-sign-current strong { min-width:48px; padding:5px 9px; border-radius:6px; background:#e4f1e5; color:#176b36; text-align:center; font-size:18px; letter-spacing:0; }
+  .encoder-sign-actions { display:flex; flex-wrap:wrap; gap:8px; }
+  .encoder-sign-actions .action { flex:1; margin:0; white-space:nowrap; }
+  .encoder-test-help { margin:12px 0 0; color:#5b655b; font-size:12px; line-height:1.45; }
+  .gate-note { padding:10px 12px; border-radius:7px; background:#fff3cd; border:1px solid #ead48a; font-size:12px; color:#665400; }
+  .verified-note { padding:10px 12px; border-radius:7px; background:#eaf7ee; border:1px solid #9bd0aa; font-size:12px; color:#216b32; }
+  @media (max-width:700px) {
+    .direction-values { grid-template-columns:1fr; }
+    .encoder-test-readouts { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .encoder-test-actions { width:100%; margin-left:0; }
+    .encoder-test-actions .action { flex:1; }
+    .encoder-test-lower { grid-template-columns:1fr; }
+  }
+  @media (max-width:430px) {
+    .encoder-test-readouts { grid-template-columns:1fr; }
+    .encoder-test-controls label { min-width:100%; }
+    .encoder-test-controls input { flex:1; width:auto; }
+    .encoder-sign-actions { flex-direction:column; }
+  }
+
+  .chart-shell { width: 100%; margin-top: 14px; padding: 14px 16px 12px; border: 1px solid #dfe4e8; border-radius: 12px; background:#f5faf4; box-sizing: border-box; }
+  .chart-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
+  .chart-title { font-size: 14px; font-weight: 700; color: #1f2933; }
+  .chart-subtitle { margin-top: 2px; font-size: 11px; color:#414b45; }
+  .chart-legend { display: flex; align-items: center; gap: 16px; font-size: 11px; color:#414b45; }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .legend-line { width: 22px; height: 2px; display: inline-block; border-radius: 2px; }
+  .legend-line.ref { background: #1f77b4; }
+  .legend-line.actual { background: #ff7f0e; }
+  .chart-area { display: flex; width: 100%; height: 170px; }
+  .chart-y-axis { position: relative; width: 42px; flex: 0 0 42px; font-size: 10px; color:#414b45; }
+  .chart-y-axis span { position: absolute; right: 8px; transform: translateY(-50%); line-height: 1; }
+  .chart-y-axis .y-top { top: 0; transform: translateY(0); }
+  .chart-y-axis .y-mid { top: 50%; }
+  .chart-y-axis .y-bottom { bottom: 0; transform: translateY(0); }
+  .chart-plot { position: relative; flex: 1; min-width: 0; height: 170px; }
+  .chart-plot canvas { display: block; width: 100%; height: 145px; }
+  .chart-x-axis { height: 25px; display: flex; justify-content: space-between; align-items: flex-start; padding-top: 5px; font-size: 10px; color:#414b45; }
+  .chart-unit { margin-top: 2px; text-align: center; font-size: 10px; color:#414b45; }
+  @media (max-width: 700px) {
+    .chart-header { align-items: flex-start; flex-direction: column; gap: 8px; }
+    .chart-legend { gap: 12px; }
+    .chart-shell { padding: 12px; }
+  }
+
+  .mode-pills { display:inline-flex; border:1px solid #052202; border-radius:6px; overflow:hidden; margin: 0 0 14px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25); }
+  .mode-pill { border:0; background:#f5faf4; color:#052202; padding:8px 22px; cursor:pointer; font-weight:600; font-size:13px; }
+  .mode-pill + .mode-pill { border-left:1px solid #052202; }
+  .mode-pill.active { background:#052202; color:white; }
+  .inline-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .inline-controls label { width:auto; min-width:105px; }
+  .position-loop-control { display:grid; grid-template-columns:130px minmax(140px, 220px) 50px 130px; align-items:center; gap:8px; margin-bottom:10px; }
+  .position-loop-control label { min-width:0; }
+  .position-loop-control input { box-sizing:border-box; width:100%; }
+  .controller-design-row { display:grid; grid-template-columns:145px minmax(100px, 180px) 110px; align-items:center; gap:8px; margin-bottom:10px; }
+  .controller-design-row label { width:auto; }
+  .controller-design-row input { box-sizing:border-box; width:100%; }
+  @media (max-width:600px) {
+    .position-loop-control { grid-template-columns:110px minmax(0, 1fr) 50px; }
+    .position-loop-control button { grid-column:2 / 4; justify-self:start; }
+    .controller-design-row { grid-template-columns:110px minmax(0, 1fr); }
+    .controller-design-row button { grid-column:2; justify-self:start; }
+  }
+  .small-status { font-size:12px; margin-top:8px; color:#3c4b5b; }
+  .unit { font-size:12px; color:#414b45; }
+
+  /* Panel layout inside the shared shell: hide the old inner sidebar and page headings */
+  .test-reference-row { display:flex; align-items:center; flex-wrap:nowrap; gap:12px; overflow-x:auto; padding:4px; }
+  .test-reference-row > * { flex:0 0 auto; white-space:nowrap; }
+  .test-reference-row .inline-controls, .test-reference-row .mode-pills { margin:0; }
+  .test-reference-row .inline-controls { flex-wrap:nowrap; gap:5px; }
+  .test-reference-row .inline-controls label { min-width:0; }
+  .test-reference-row .mode-pill { padding:7px 10px; }
+  #page-testing .test-reference-row input, #page-testing #sensorCurrent { width:72px; box-sizing:border-box; }
+  :host { display:block; font-family:-apple-system,"Segoe UI",sans-serif; font-size:16px; }
+  .sidebar { display:none !important; }
+  .main { display:block !important; overflow:visible !important; }
+  .content { padding:0 !important; overflow:visible !important; }
+  .page > h2 { display:none !important; }
+  @container (max-width:430px) {
+    .motor-columns { display:block; }
+    .motor-column { margin-bottom:16px; }
+    .status-grid { grid-template-columns:1fr 1fr; }
+  }
+</style>
+
+<div class="sidebar">
+  <div class="sidebar-status">
+    <div class="srow"><span>Firmware</span><span id="sideVersion">-</span></div>
+    <div class="srow"><span>Active</span><span class="sflag" id="sideActive">NO</span></div>
+    <div class="srow"><span>Fault</span><span class="sflag" id="sideFault">none</span></div>
+  </div>
+  <button id="connectToggle" hidden><span id="statusDot"></span><span id="statusText">Connect</span></button>
+</div>
+
+<div class="main">
+  <div class="content">
+
+    <!-- ============ HOME ============ -->
+    <div class="page active" id="page-home">
+      <div class="hero">
+        <h1>Brushed DC Motor Control</h1>
+        <p>Connect your board, flash firmware, optionally test direction, auto-tune, and test velocity and position control from here.</p>
+
+        <div class="stat-grid">
+          <div class="stat-card"><div class="label">Connection</div><div class="value" id="homeConn">Not connected</div></div>
+          <div class="stat-card"><div class="label">Board</div><div class="value" id="homeBoard">Single Motor</div></div>
+          <div class="stat-card"><div class="label">State</div><div class="value" id="homeState">-</div></div>
+          <div class="stat-card"><div class="label">Firmware</div><div class="value" id="homeVersion">-</div></div>
+          <div class="stat-card"><div class="label">Active</div><div class="value" id="homeActive">NO</div></div>
+        </div>
+
+        <div class="quick-links">
+          <div class="quick-link" data-goto="firmware"><div class="title">Firmware Update</div><div class="desc">Flash new firmware via DFU</div></div>
+          <div class="quick-link" data-goto="motorsetup"><div class="title">Motor Setup</div><div class="desc">Check motor and encoder direction</div></div>
+          <div class="quick-link" data-goto="tuning"><div class="title">Tuning</div><div class="desc">Identify the motor, calculate gains, tune the position loop</div></div>
+          <div class="quick-link" data-goto="sensors"><div class="title">Sensors</div><div class="desc">Read raw encoder count and CPR</div></div>
+          <div class="quick-link" data-goto="testing"><div class="title">Testing</div><div class="desc">Switch modes and test velocity or position control.</div></div>
+          <div class="quick-link" data-goto="blackbox"><div class="title">Blackbox</div><div class="desc">Record and export telemetry</div></div>
+          <div class="quick-link" data-goto="backup"><div class="title">Backup / Restore</div><div class="desc">Save or reload a full config</div></div>
+          <div class="quick-link" data-goto="cli"><div class="title">CLI</div><div class="desc">Send raw commands to the board</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ BOARD ============ -->
+    <div class="page" id="page-boards">
+      <h2>Board</h2>
+      <div class="box">
+        <div class="box-header">Connected Board</div>
+        <div class="box-body">
+          <div class="board-option selected" id="boardSingle">
+            <div style="font-weight:600;">Single Motor</div>
+            <div style="font-size:12px; color:#414b45;">STM32-based brushed DC motor controller</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ FIRMWARE UPDATE ============ -->
+    <div class="page" id="page-firmware">
+      <h2>Firmware Update</h2>
+      <div class="dfu-note">
+        <b>First time flashing this board?</b> If it isn't already running compatible firmware, "Enter DFU Mode" won't work.
+        Hold <b>BOOT0</b>, press <b>Reset</b>, release BOOT0, then skip straight to "Choose File" below.
+      </div>
+      <div class="box">
+        <div class="box-header">DFU Mode</div>
+        <div class="box-body"><button class="action" id="bootloaderBtn">Enter DFU Mode</button></div>
+      </div>
+      <div class="box">
+        <div class="box-header">Flash</div>
+        <div class="box-body">
+          <input type="file" id="firmwareFile" accept=".bin">
+          <button class="action" id="flashBtn">Flash Firmware</button>
+          <progress id="flashProgress" value="0" max="100" style="width:100%; margin-top:10px;"></progress>
+          <div id="flashStatus" style="font-size:13px; color:#414b45; margin-top:6px;">Idle</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CAN CONFIGURATION ============ -->
+    <div class="page" id="page-can">
+      <h2>CAN</h2>
+      <p class="hint-note">Shared CAN configuration for both motors. Settings load from the board when connected.</p>
+      <div class="warn-note"><b>Stop both motors before saving changes.</b> Save stores the bitrate, IDs and operation mode in flash for the next power-up. Restore discards unsaved edits and reloads the saved board settings.</div>
+      <div class="can-columns">
+      <div class="box">
+        <div class="box-header">CAN Setting</div>
+        <div class="box-body">
+          <div class="can-grid">
+            <div class="can-field">
+              <label for="canBitrateButton">CAN bitrate</label>
+<div class="can-rate-picker" id="canBitratePicker">
+  <button type="button" class="can-rate-button" id="canBitrateButton" aria-haspopup="listbox" aria-expanded="false" aria-controls="canBitrateMenu"><span id="canBitrateLabel">Waiting for board…</span><span class="dropdown-arrow" aria-hidden="true"></span></button>
+  <div class="can-rate-menu" id="canBitrateMenu" role="listbox" aria-labelledby="canBitrateButton" hidden>
+    <div class="can-rate-option" role="option" tabindex="-1" data-value="125000" aria-selected="false">125 kbit/s</div>
+    <div class="can-rate-option" role="option" tabindex="-1" data-value="250000" aria-selected="false">250 kbit/s</div>
+    <div class="can-rate-option" role="option" tabindex="-1" data-value="500000" aria-selected="false">500 kbit/s</div>
+    <div class="can-rate-option" role="option" tabindex="-1" data-value="1000000" aria-selected="false">1 Mbit/s</div>
+  </div>
+</div>
+<select id="canBitrate" hidden aria-hidden="true" tabindex="-1">
+  <option value="" disabled selected>Waiting for board…</option>
+  <option value="125000">125 kbit/s</option>
+  <option value="250000">250 kbit/s</option>
+  <option value="500000">500 kbit/s</option>
+  <option value="1000000">1 Mbit/s</option>
+</select>
+              <p class="can-help">Every device on the CAN bus must use the same bitrate.</p>
+            </div>
+          </div>
+          <div class="can-grid" style="margin-top:16px">
+            <div>
+            <div class="can-field">
+              <label for="canRxId">Command ID (RX)</label>
+              <input type="text" id="canRxId" value="" placeholder="Waiting for board…" maxlength="5" inputmode="text" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="can-field">
+              <label for="canTxId">Feedback ID (TX)</label>
+              <input type="text" id="canTxId" value="" placeholder="Waiting for board…" maxlength="5" inputmode="text" autocomplete="off" spellcheck="false">
+            </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header">Operation Modes</div>
+        <div class="box-body">
+          <div class="can-field">
+            <label for="canOperationModeButton">Operation mode</label>
+            <div class="can-rate-picker" id="canOperationModePicker">
+              <button type="button" class="can-rate-button" id="canOperationModeButton" disabled aria-haspopup="listbox" aria-expanded="false" aria-controls="canOperationModeMenu"><span id="canOperationModeLabel">Waiting for board…</span><span class="dropdown-arrow" aria-hidden="true"></span></button>
+              <div class="can-rate-menu" id="canOperationModeMenu" role="listbox" aria-labelledby="canOperationModeButton" hidden>
+                <div class="can-rate-option" role="option" tabindex="-1" data-value="0" aria-selected="false">Both motors — Velocity</div>
+                <div class="can-rate-option" role="option" tabindex="-1" data-value="1" aria-selected="false">Both motors — Position</div>
+                <div class="can-rate-option" role="option" tabindex="-1" data-value="2" aria-selected="false">Motor 1 — Velocity / Motor 2 — Position</div>
+                <div class="can-rate-option" role="option" tabindex="-1" data-value="3" aria-selected="false">Motor 1 — Position / Motor 2 — Velocity</div>
+              </div>
+            </div>
+            <select id="canOperationMode" hidden aria-hidden="true" tabindex="-1">
+              <option value="" disabled selected>Waiting for board…</option>
+              <option value="0">Both motors — Velocity</option>
+              <option value="1">Both motors — Position</option>
+              <option value="2">Motor 1 — Velocity / Motor 2 — Position</option>
+              <option value="3">Motor 1 — Position / Motor 2 — Velocity</option>
+            </select>
+            <p class="can-help">Saved for CAN control and feedback. Testing-tab mode selections do not change this setting.</p>
+          </div>
+        </div>
+      </div>
+      </div>
+      <div class="tab-config-actions can-actions">
+        <div class="can-state config-action-status" id="canConfigStatus" role="status" aria-live="polite"></div>
+        <button class="action secondary" id="readCanConfigBtn" disabled>Restore</button>
+        <button class="action apply-button" id="applyCanConfigBtn" disabled>Save</button>
+      </div>
+    </div>
+
+    <!-- ============ MOTOR SETUP / DIRECTION TEST ============ -->
+    <div class="page" id="page-motorsetup">
+      <h2>Motor Setup</h2>
+      <div class="warn-note" id="setupOperationNote">Start a direction test or identification directly. Valid gains are required for velocity and position control.</div>
+      <div class="box">
+        <div class="box-header">Motor operation</div>
+        <div class="box-body">
+          <div id="motorControlGate" class="gate-note" style="margin-bottom:12px;">Direction testing is optional. Use closed-loop control when you are confident the saved encoder sign is correct.</div>
+          <p style="font-size:13px; margin-top:0;">Status: <b id="motorActiveLabel">STOPPED</b> &nbsp;|&nbsp; Fault: <b id="motorFaultLabel">none</b></p>
+          
+          <button class="action danger" id="stopBtn" disabled>Stop Motor</button>
+          <p style="font-size:12px; color:#414b45; margin-top:10px;">Stop ends the current motor operation.</p>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header">Encoder Sign Testing</div>
+        <div class="box-body">
+          <p class="encoder-test-intro">Open-loop PWM test for checking encoder feedback direction.</p>
+          <div class="encoder-test-safety">Start with a small duty and make sure the motor can rotate freely. The motor responds as soon as the test starts.</div>
+          <div class="encoder-test-controls">
+            <label for="directionRefInput">Test duty</label>
+            <input type="number" id="directionRefInput" value="10" min="-100" max="100" step="1">
+            <span class="unit">%</span>
+            <div class="encoder-test-actions">
+              <button class="action" id="directionStartBtn">Start Test</button>
+              <button class="action danger" id="directionStopBtn" disabled>Stop</button>
+            </div>
+          </div>
+          <div class="direction-values encoder-test-readouts">
+            <div class="direction-value"><div class="small">Reference</div><div class="big" id="directionReference">0.0 %</div></div>
+            <div class="direction-value"><div class="small">Output</div><div class="big" id="directionOmega">0.00 RPM</div></div>
+          </div>
+          <div class="encoder-test-lower">
+            <div class="direction-result" id="directionResult">
+              <div class="direction-status" id="directionStatus">Not tested</div>
+              <div style="font-size:12px; margin-top:5px;" id="directionDetail">Start the test, then inspect the encoder feedback.</div>
+            </div>
+            <div class="encoder-sign-panel">
+              <div class="encoder-sign-current"><span>Current encoder sign</span><strong id="directionSign">+1</strong></div>
+              <div class="encoder-sign-actions">
+                <button class="action secondary" id="flipEncoderBtn" disabled>Flip Encoder Sign</button>
+                <button class="action" id="confirmDirectionBtn" disabled>Confirm Direction</button>
+              </div>
+            </div>
+          </div>
+          <p class="encoder-test-help">If the reference and <code>Output</code> have different signs, flip the encoder sign and repeat the test. Confirm when the signs match.</p>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header">Motor Direction</div>
+        <div class="box-body">
+          <p class="hint-note">
+            Changes physical motor rotation for a positive command.
+            Positive speed and position references remain positive.
+          </p>
+
+          <div class="inline-controls">
+            <label for="motorDirectionButton">Motor direction</label>
+
+            <div class="can-rate-picker" id="motorDirectionPicker">
+<button type="button" class="can-rate-button" id="motorDirectionButton" disabled aria-haspopup="listbox" aria-expanded="false" aria-controls="motorDirectionMenu" aria-describedby="motorDirectionStatus"><span id="motorDirectionLabel">Normal</span><span class="dropdown-arrow" aria-hidden="true"></span></button>
+<div class="can-rate-menu" id="motorDirectionMenu" role="listbox" aria-labelledby="motorDirectionButton" hidden>
+<div class="can-rate-option selected" role="option" tabindex="0" data-value="1" aria-selected="true">Normal</div>
+<div class="can-rate-option" role="option" tabindex="0" data-value="-1" aria-selected="false">Reversed</div>
+</div></div>
+<select id="motorDirectionSelect" disabled hidden aria-hidden="true" tabindex="-1">
+              <option value="1">Normal</option>
+              <option value="-1">Reversed</option>
+            </select>
+            <button class="action secondary apply-button"
+                    id="applyMotorDirectionBtn">
+              Apply
+            </button>
+            <span id="motorDirectionStatus" class="unit"></span>
+          </div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header">Direction Status</div>
+        <div class="box-body"><div id="directionGate" class="gate-note">Direction has not been verified.</div></div>
+      </div>
+    </div>
+
+    <!-- ============ TUNING ============ -->
+    <div class="page" id="page-tuning"><p class="hint-note">Press Enter in an editable value to apply it.</p>
+      <h2>Tuning</h2>
+
+      <div class="box">
+        <div class="box-header">Tustin Filter</div>
+        <div class="box-body">
+          <p class="hint-note" style="margin:0 0 10px;">
+            Velocity filter time constant.
+          </p>
+          <label>τ<sub>d</sub> (s)</label>
+          <input type="number" id="m1TauDInput" value="" placeholder="Reading..." min="0.0001" step="0.001">
+          <button class="action apply-button" id="m1ApplyTauDBtn">Apply</button>
+        </div>
+      </div>
+
+      <div class="box">
+        <div class="box-header">Controller Design</div>
+        <div class="box-body">
+          <div class="controller-design-row"><label for="m1ZetaInput">ζ</label><input type="number" id="m1ZetaInput" value="" placeholder="Reading..." min="0.3" max="1.5" step="0.01"><button class="action secondary apply-button" id="m1ApplyZetaBtn">Apply</button></div>
+          <div class="controller-design-row"><label for="m1OmegaInput">ω<sub>n</sub> (rad/s)</label><input type="number" id="m1OmegaInput" value="" placeholder="Reading..." min="1" max="200" step="0.1"><button class="action secondary apply-button" id="m1ApplyOmegaBtn">Apply</button></div>
+          <p style="font-size:11px; color:#414b45; margin:8px 0 12px;"></p>
+          <div id="tuningGate" class="gate-note" style="margin-bottom:12px;">Run identification, then apply velocity or position targets. Direction testing is optional.</div>
+          <button class="action" id="m1TuneBtn" disabled>Start Tune</button>
+          <span id="m1TuneStatus" style="font-size:12px; color:#414b45;">Idle</span>
+        </div>
+      </div>
+
+      <div class="box">
+        <div class="box-header">Live Identification</div>
+        <div class="box-body">
+          <table class="data">
+            <tr><th>a</th><td id="m1RlsA">-</td><th>b</th><td id="m1RlsB">-</td></tr>
+            <tr><th>K</th><td id="m1RlsK">-</td><th>tau</th><td id="m1RlsTau">-</td></tr>
+            <tr><th>Kp</th><td id="m1RlsKp">-</td><th>Ki</th><td id="m1RlsKi">-</td><th>Kff</th><td id="m1RlsKff">-</td></tr>
+            <tr><th>samples</th><td id="m1RlsSamples">-</td><th>status</th><td id="m1ConvergeBadge">not converged</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="warn-note">
+        Applying a target or starting a test can move the motor immediately. Secure the motor and clear the shaft before testing.
+      </div>
+      <div class="box">
+        <div class="box-header">Position Loop Tuning</div>
+        <div class="box-body">
+          <p class="hint-note">The position loop clamps its velocity reference between these independent limits.</p>
+          <div class="position-loop-control"><label for="posKpInput">Position Kp</label><input type="number" id="posKpInput" value="" placeholder="Enter Kp" min="0" step="0.01"><span class="unit">RPM/deg</span><button class="action apply-button" id="setPosKpBtn" disabled>Apply</button></div>
+          <div class="position-loop-control"><label for="posMaxRpmInput">Max velocity</label><input type="number" id="posMaxRpmInput" value="" placeholder="Enter RPM" min="1" step="1"><span class="unit">RPM</span><button class="action apply-button" id="setPosMaxRpmBtn" disabled>Apply</button></div>
+          <div class="position-loop-control"><label for="posMinRpmInput">Min velocity</label><input type="number" id="posMinRpmInput" value="" placeholder="Enter negative RPM" min="-300" max="0" step="1"><span class="unit">RPM</span><button class="action apply-button" id="setPosMinRpmBtn" disabled>Apply</button></div>
+          <hr style="margin:14px 0; border:0; border-top:1px solid #ddd;">
+          <p class="hint-note">Valid gains are required before sending a target. Direction testing is optional. Change Position Kp and observe the response below.</p>
+          <div class="inline-controls"><label for="positionTuneTargetInput">Desired position</label><input type="number" id="positionTuneTargetInput" value="0" step="1"><span class="unit">deg</span><button class="action" id="setPositionTuneTargetBtn" disabled>Set Target / Test</button></div>
+          <div class="inline-controls"><label for="positionTuneActual">Actual position</label><input type="text" id="positionTuneActual" value="—" readonly><span class="unit">deg</span></div>
+<div id="positionTuneStatus" class="small-status">After identification, set a target directly. Direction testing is optional.</div>
+          <div id="posTuneChartHost"></div>
+        </div>
+      </div>
+
+      <p class="hint-note">
+        When RLS converges, the firmware calculates Kp, Ki, and Kff from the identified motor model.
+        Those values are applied to the velocity controller immediately and shown on the Testing tab.
+        No manual gain entry is required.
+      </p>
+      <p style="font-size:12px; color:#414b45;">Saving either section writes the current configuration to flash. Sensor settings include CPR, encoder sign, motor direction, and direction confirmation. Tuning settings include ζ, ω<sub>n</sub>, τ<sub>d</sub>, position Kp and velocity limits, plus valid identified velocity gains.</p>
+      <div class="tab-config-actions">
+        <span class="config-action-status" data-section="tuning" role="status" aria-live="polite"></span>
+        <button class="action secondary restore-tab-config-btn" data-section="tuning">Restore</button>
+        <button class="action save-tab-config-btn" data-section="tuning">Save</button>
+      </div>
+    </div>
+
+    <!-- ============ SENSORS ============ -->
+    <div class="page" id="page-sensors">
+      <h2>Sensors</h2>
+      <div class="box">
+        <div class="box-header">Encoder</div>
+        <div class="box-body">
+          <div class="status-grid" style="margin-top:14px;">
+            <div class="status-item">
+              <div class="slabel">Raw Count</div>
+              <div class="svalue" id="sensorEncCount">-</div>
+            </div>
+            <div class="status-item">
+              <div class="slabel">Configured CPR</div>
+              <div class="svalue" id="sensorEncCpr">-</div>
+            </div>
+            <div class="status-item">
+              <div class="slabel">Last Update</div>
+              <div class="svalue" id="sensorEncUpdated">-</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header">Encoder Measurement</div>
+        <div class="box-body">
+          <div class="inline-controls">
+            <button class="action secondary" id="startCprCalibrationBtn">Start Measurement</button>
+            <button class="action secondary" id="finishCprCalibrationBtn" disabled>Finish Measurement</button>
+          </div>
+          <p id="cprCalibrationStatus" class="can-help">Stop the motor. Start measurement, rotate the shaft exactly one full revolution manually, then finish measurement.</p>
+          <div class="inline-controls" style="margin-top:12px;flex-wrap:nowrap;">
+            <label for="m1CprInput" style="width:auto;min-width:0;white-space:normal;">Measured counts per revolution (CPR)</label>
+            <input type="number" id="m1CprInput"
+                  style="width:18ch;min-width:0;max-width:50%" value="" placeholder="Start measurement" min="1" step="1">
+            <button class="action apply-button" id="m1ApplyCprBtn">
+              Apply CPR
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header">Encoder Count (live)</div>
+        <div class="box-body">
+          <p style="font-size:12px; color:#414b45; margin:0 0 4px;">Raw quadrature count vs. time, streamed on every TELEM line.</p>
+          <canvas id="sensorEncChart" class="plain"></canvas>
+        </div>
+      </div>
+      <div class="tab-config-actions">
+        <span class="config-action-status" data-section="sensors" role="status" aria-live="polite"></span>
+        <button class="action secondary restore-tab-config-btn" data-section="sensors">Restore</button>
+        <button class="action save-tab-config-btn" data-section="sensors">Save</button>
+      </div>
+    </div>
+
+    <!-- ============ TESTING ============ -->
+    <div class="page" id="page-testing"><p class="hint-note">Press Enter in the reference field to command the motor.</p>
+      <h2>Testing</h2>
+
+      <div class="box">
+        <div class="box-header">System Status</div>
+        <div class="box-body">
+          <div class="status-grid">
+            <div class="status-item"><div class="slabel">Board</div><div class="svalue" id="motorsStatusBoard">Single Motor</div></div>
+            <div class="status-item"><div class="slabel">Control Mode</div><div class="svalue" id="motorsStatusMode">—</div></div>
+            <div class="status-item"><div class="slabel">Position loop</div><div class="svalue">100 Hz</div></div>
+            <div class="status-item"><div class="slabel">Velocity loop</div><div class="svalue">200 Hz</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="box">
+        <div class="box-header">Controller Gains (active)</div>
+        <div class="box-body">
+          <div class="motor-columns">
+            <div class="motor-column">
+              <div class="motor-column-header">Velocity Controller</div>
+              <label>Kp</label><input type="number" id="m1GainKp" step="0.0001" value="" readonly><br>
+              <label>Ki</label><input type="number" id="m1GainKi" step="0.0001" value="" readonly><br>
+              <label>Kff</label><input type="number" id="m1GainKff" step="0.0001" value="" readonly>
+              <p style="font-size:11px; color:#414b45; margin-top:6px;">Identified on the Tuning tab and currently active on the inner velocity loop.</p>
+            </div>
+            <div class="motor-column">
+              <div class="motor-column-header">Position Controller</div>
+              <label>Kp</label><input type="number" id="posGainKp" step="0.01" value="" placeholder="Not set" readonly><span class="unit"> RPM/deg</span>
+              <p style="font-size:11px; color:#414b45; margin-top:6px;">Outer position loop gain, as applied on the Tuning tab.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="box">
+        <div class="box-header">Reference / Output</div>
+        <div class="box-body">
+          <div class="test-reference-row">
+          <div class="mode-pills">
+            <button class="mode-pill active" id="testingVelocityMode" type="button">Velocity</button>
+            <button class="mode-pill" id="testingPositionMode" type="button">Position</button>
+          </div>
+          <div class="inline-controls">
+            <label for="desiredInput">Desired value</label>
+            <input type="number" id="desiredInput" value="0" step="1">
+            <span class="unit" id="desiredUnit">RPM</span>
+            <button class="action" id="setDesiredBtn" disabled>Set Velocity</button>
+          </div>
+          <div class="inline-controls">
+            <label for="measuredInput">Measured value</label>
+            <input type="text" id="measuredInput" value="—" readonly>
+            <span class="unit" id="measuredUnit">RPM</span>
+          </div>
+          </div>
+          <p class="small-status" id="desiredHint"></p>
+
+          <div id="velChartHost"></div>
+          <div id="posChartHost"></div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header">Current sensing</div>
+        <div class="box-body">
+          <div class="inline-controls">
+            <label for="sensorCurrent">Shunt current</label>
+            <input type="text" id="sensorCurrent" value="—" readonly>
+          </div>
+          <p class="can-help" id="sensorCurrentStatus" role="status"></p>
+          <div id="currentChartHost"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ BLACKBOX ============ -->
+    <div class="page" id="page-blackbox">
+      <h2>Blackbox</h2>
+      <div class="box">
+        <div class="box-header">Recording</div>
+        <div class="box-body">
+          <p id="logStatus" class="small-status">Automatically records each active run while the UI is connected.</p>
+          <button class="action secondary" id="logClearBtn">Clear</button>
+          <button class="action" id="logDownloadBtn" disabled>Download CSV</button>
+          <p style="font-size:13px; margin-top:10px;">Records captured: <b id="logCount">0</b> · Runs: <b id="logRunCount">0</b></p>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header">Preview</div>
+        <div class="box-body"><canvas id="logRunChart" class="plain"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ============ BACKUP / RESTORE ============ -->
+    <div class="page" id="page-backup">
+      <h2>Local Config File</h2>
+      <p style="font-size:13px; color:#555; margin-top:-6px;">Use this page to keep a portable configuration file on your computer or load one onto a controller. For settings stored on this controller, use Save and Restore on the Sensor and Tuning pages.</p>
+      <div class="box">
+        <div class="box-header">Save a file to this computer</div>
+        <div class="box-body">
+          <p style="font-size:13px; margin-top:0;">Connect to the controller, then download its current configuration as a JSON file. Keep this file to transfer settings to another computer or controller, or as a recovery copy.</p>
+          <button class="action" id="exportConfigBtn">Download Backup File</button>
+          <pre id="configPreview" style="font-size:12px; background:#f5faf4; border:1px solid #ccc; border-radius:6px; padding:10px; margin-top:10px; min-height:60px;">no config read yet</pre>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header">Load a file onto this controller</div>
+        <div class="box-body">
+          <p style="font-size:13px; margin-top:0;">
+            Connect and stop the controller, choose a JSON backup, and apply its supported settings for this session.
+            This does not save them to controller flash. Use Save on the Sensor and Tuning pages if you want to keep them there.
+            Encoder sign, direction confirmation, and identified velocity gains are not restored; verify encoder direction and run Auto Tune when needed.
+          </p>
+          <input type="file" id="importConfigFile" accept=".json">
+          <button class="action" id="importConfigBtn">Load Backup File</button>
+          <p id="configRestoreStatus" style="font-size:12px; color:#555; margin-bottom:0;">Restore requires a connected, stopped controller.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CLI ============ -->
+    <div class="page" id="page-cli">
+      <h2>CLI</h2>
+      <div class="box">
+        <div class="box-header">Console</div>
+        <div class="box-body">
+          <div class="cli-output" id="cliOutput"></div>
+          <div class="cli-input-row">
+            <input type="text" id="cliInput" placeholder="e.g. GET_VERSION, GET_CONFIG, SET_MODE:POSITION, SET_CPR:592, SET_POS_MIN_RPM:-100, SET_POS_KP:1, SAVE_CONFIG, STOP">
+            <button class="action" id="cliSendBtn">Send</button>
+          </div>
+          <p style="font-size:11px; color:#414b45; margin-top:6px;">Up / Down arrow cycles command history.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+</div>
+</template>
+<script>
+function createMotorPanel(root, motor, dual) {
+
+const realDocument = globalThis.document;
+const timers = [], listeners = [];
+const document = new Proxy(realDocument, { get(target, key) {
+  if (key === 'getElementById') return id => root.getElementById(id);
+  if (key === 'querySelector' || key === 'querySelectorAll') return root[key].bind(root);
+  if (key === 'addEventListener' || key === 'removeEventListener') return root[key].bind(root);
+  if (key === 'activeElement') return root.activeElement;
+  const value = target[key]; return typeof value === 'function' ? value.bind(target) : value;
+}});
+const window = new Proxy(globalThis, { get(target, key) {
+  if (key === 'addEventListener') return (type, fn, options) => { listeners.push([type,fn,options]); globalThis.addEventListener(type,fn,options); };
+  const value = target[key]; return typeof value === 'function' ? value.bind(target) : value;
+}});
+const setInterval = (fn, delay) => { const id=globalThis.setInterval(fn,delay); timers.push(id); return id; };
+const setTimeout = (fn, delay) => { const id=globalThis.setTimeout(fn,delay); timers.push(id); return id; };
+
+let port, writer;
+let abortController = null;
+let isActive = false;
+let identifiedGains = { kp: 0, ki: 0, kff: 0 };
+let lastConfig = null;
+let recording = false;
+let logBuffer = [];
+let logRunCounter = 0;
+let activeLogRunId = null;
+let lastTelemetryTime = null;
+let cliHistory = [];
+let cliHistoryIdx = -1;
+let directionVerified = false;
+let directionTestActive = false;
+let identificationActive = false;
+let lastEncoderCount = null;
+let cprCalibrationStartCount = null;
+
+function updateCprMeasurement(count) {
+  lastEncoderCount = count;
+
+  if (cprCalibrationStartCount === null) return;
+
+  // Handle rollover of the 32-bit encoder counter.
+  const measured = Math.abs((count - cprCalibrationStartCount) | 0);
+
+  document.getElementById('m1CprInput').value = measured;
+  document.getElementById('cprCalibrationStatus').textContent =
+    'Counting: ' + measured +
+    ' counts. Rotate exactly one full revolution, stop, then click Finish Measurement.';
+}
+
+function cancelCprMeasurement() {
+  if (cprCalibrationStartCount === null) return;
+
+  cprCalibrationStartCount = null;
+  document.getElementById('m1CprInput').value = '';
+  document.getElementById('m1CprInput').readOnly = false;
+  document.getElementById('m1ApplyCprBtn').disabled = false;
+  document.getElementById('finishCprCalibrationBtn').disabled = true;
+  document.getElementById('cprCalibrationStatus').textContent =
+    'Measurement cancelled. Connect and stop the motor, then start again.';
+}
+const POSITION_POLL_MS = 100;
+
+const CLI_MAX_LINES = 500;
+function log(msg) {
+  let cls = 'rx';
+  if (msg.startsWith('> ')) { cls = 'tx'; msg = msg.substring(2); }
+  else if (msg.startsWith('< ')) { cls = msg.includes('ERR:') ? 'err' : 'rx'; msg = msg.substring(2); }
+  else if (/error|failed|failure|ERR:|not connected/i.test(msg)) { cls = 'err'; }
+  cliEcho(msg, cls);
+}
+
+// ---------------- Page navigation (driven by the shared sidebar) ----------------
+document.querySelectorAll('.quick-link').forEach(link => {
+  link.addEventListener('click', () => globalThis.motorBoard.navigate(link.dataset.goto));
+});
+function goToPage(pageName) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const target = document.getElementById('page-' + pageName);
+  if (!target) return;
+  target.classList.add('active');
+
+  if (pageName === 'testing') {
+    velChart.resize();
+    posChart.resize();
+    currentChart.resize();
+    document.getElementById('motorsStatusBoard').textContent = dual ? 'Dual Motor' : 'Single Motor';
+  }
+  if (pageName === 'tuning') { posTuneChart.resize(); if (writer) sendCommand('GET_CONFIG', true); }
+  if (pageName === 'blackbox') { logRunChart.resize(); }
+  if (pageName === 'sensors') { sensorEncChart.resize(); }
+
+}
+
+// These commands are implemented by the matching firmware CAN configuration handler.
+let canConfigRequestPending = null;
+let canConfigLoaded = false;
+function updateCanControls() {
+  const connected = dual && motor === 1 && !!writer;
+  const editable = connected && canConfigLoaded && !canConfigRequestPending;
+  for (const id of ['canBitrateButton','canBitrate','canRxId','canTxId','canOperationMode','canOperationModeButton','applyCanConfigBtn']) {
+    document.getElementById(id).disabled = !editable;
+  }
+  document.getElementById('readCanConfigBtn').disabled = !connected || !!canConfigRequestPending;
+  if (!editable) { closeCanBitrateMenu(); closeCanOperationModeMenu(); }
+}
+function resetCanConfig() {
+  canConfigLoaded = false;
+  canConfigRequestPending = null;
+  setCanOperationMode('');
+  for (const id of ['canBitrate','canRxId','canTxId','canOperationMode']) document.getElementById(id).value = '';
+  document.getElementById('canBitrateLabel').textContent = 'Waiting for board…';
+  document.querySelectorAll('#canBitrateMenu [data-value]').forEach(option => {
+    option.classList.remove('selected'); option.setAttribute('aria-selected', 'false');
+  });
+  showCanConfigStatus(dual ? 'Connect to load saved board settings.' : 'CAN setup requires dual-motor CAN firmware.');
+}
+function showCanConfigStatus(message, state = '') {
+  const status = document.getElementById('canConfigStatus');
+  status.textContent = message;
+  status.className = 'can-state config-action-status' + (state ? ' ' + state : '');
+  updateCanControls();
+}
+function parseCanId(value) {
+  const normalized = value.trim();
+  if (!/^(?:0x)?[0-9a-fA-F]{1,3}$/.test(normalized)) return null;
+  const id = Number.parseInt(normalized.replace(/^0x/i, ''), 16);
+  return id <= 0x7ff ? id : null;
+}
+function setCanBitrate(value) {
+  const select = document.getElementById('canBitrate');
+  const selectedValue = String(value);
+  select.value = selectedValue;
+  const selectedOption = [...document.querySelectorAll('#canBitrateMenu [data-value]')].find(option => option.dataset.value === selectedValue);
+  if (!selectedOption) return false;
+  document.getElementById('canBitrateLabel').textContent = selectedOption.textContent;
+  document.querySelectorAll('#canBitrateMenu [data-value]').forEach(option => {
+    const selected = option === selectedOption;
+    option.classList.toggle('selected', selected);
+    option.setAttribute('aria-selected', selected ? 'true' : 'false');
+  });
+  return true;
+}
+function setCanOperationMode(value) {
+  document.getElementById('canOperationMode').value = value;
+  const labels = ['Both motors — Velocity', 'Both motors — Position', 'Motor 1 — Velocity / Motor 2 — Position', 'Motor 1 — Position / Motor 2 — Velocity'];
+  document.getElementById('canOperationModeLabel').textContent = labels[value] || 'Waiting for board…';
+  document.querySelectorAll('#canOperationModeMenu [data-value]').forEach(option => {
+    const selected = option.dataset.value === value;
+    option.classList.toggle('selected', selected);
+    option.setAttribute('aria-selected', String(selected));
+  });
+}
+function closeCanOperationModeMenu(restoreFocus = false) {
+  document.getElementById('canOperationModeMenu').hidden = true;
+  document.getElementById('canOperationModeButton').setAttribute('aria-expanded', 'false');
+  if (restoreFocus) document.getElementById('canOperationModeButton').focus();
+}
+function openCanOperationModeMenu() {
+  const button = document.getElementById('canOperationModeButton');
+  if (button.disabled) return;
+  closeCanBitrateMenu();
+  const menu = document.getElementById('canOperationModeMenu');
+  menu.hidden = false;
+  button.setAttribute('aria-expanded', 'true');
+  (menu.querySelector('[aria-selected="true"]') || menu.querySelector('[data-value]'))?.focus();
+}
+document.getElementById('canOperationModeButton').addEventListener('click', () => {
+  if (document.getElementById('canOperationModeMenu').hidden) openCanOperationModeMenu();
+  else closeCanOperationModeMenu();
+});
+document.getElementById('canOperationModeButton').addEventListener('keydown', event => {
+  if (['ArrowDown','ArrowUp','Enter',' '].includes(event.key)) { event.preventDefault(); openCanOperationModeMenu(); }
+});
+document.getElementById('canOperationModeMenu').addEventListener('click', event => {
+  if (document.getElementById('canOperationModeButton').disabled) return;
+  const option = event.target.closest('[data-value]');
+  if (!option) return;
+  setCanOperationMode(option.dataset.value);
+  closeCanOperationModeMenu(true);
+});
+document.getElementById('canOperationModeMenu').addEventListener('keydown', event => {
+  const options = [...document.querySelectorAll('#canOperationModeMenu [data-value]')];
+  const current = options.indexOf(document.activeElement);
+  let next = current;
+  if (event.key === 'ArrowDown') next = (current + 1) % options.length;
+  else if (event.key === 'ArrowUp') next = (current - 1 + options.length) % options.length;
+  else if (event.key === 'Home') next = 0;
+  else if (event.key === 'End') next = options.length - 1;
+  else if (event.key === 'Escape') { event.preventDefault(); closeCanOperationModeMenu(true); return; }
+  else if (event.key === 'Tab') { closeCanOperationModeMenu(); return; }
+  else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); document.activeElement.click(); return; }
+  else return;
+  event.preventDefault(); options[next]?.focus();
+});
+document.addEventListener('click', event => {
+  if (!document.getElementById('canOperationModePicker').contains(event.target)) closeCanOperationModeMenu();
+});
+function setMotorDirection(value) {
+  if (value !== '1' && value !== '-1') return false;
+  document.getElementById('motorDirectionSelect').value = value;
+  document.getElementById('motorDirectionLabel').textContent = value === '1' ? 'Normal' : 'Reversed';
+  document.querySelectorAll('#motorDirectionMenu [data-value]').forEach(option => {
+    const selected = option.dataset.value === value;
+    option.classList.toggle('selected', selected);
+    option.setAttribute('aria-selected', String(selected));
+  });
+  return true;
+}
+function closeMotorDirectionMenu() {
+  document.getElementById('motorDirectionMenu').hidden = true;
+  document.getElementById('motorDirectionButton').setAttribute('aria-expanded', 'false');
+}
+function chooseMotorDirection(value) {
+  const apply = document.getElementById('applyMotorDirectionBtn');
+  if (apply.disabled || !setMotorDirection(value)) return;
+  closeMotorDirectionMenu();
+  document.getElementById('motorDirectionButton').focus();
+  apply.click();
+}
+document.getElementById('motorDirectionButton').addEventListener('click', () => {
+  const button = document.getElementById('motorDirectionButton');
+  if (button.disabled) return;
+  const menu = document.getElementById('motorDirectionMenu');
+  menu.hidden = !menu.hidden;
+  button.setAttribute('aria-expanded', String(!menu.hidden));
+});
+document.getElementById('motorDirectionMenu').addEventListener('click', event => {
+  const option = event.target.closest('[data-value]');
+  if (option) chooseMotorDirection(option.dataset.value);
+});
+document.getElementById('motorDirectionMenu').addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    closeMotorDirectionMenu();
+    document.getElementById('motorDirectionButton').focus();
+  }
+  const option = event.target.closest('[data-value]');
+  if (option && (event.key === 'Enter' || event.key === ' ')) {
+    event.preventDefault();
+    if (!event.repeat) chooseMotorDirection(option.dataset.value);
+  }
+});
+document.addEventListener('click', event => {
+  if (!document.getElementById('motorDirectionPicker').contains(event.target)) closeMotorDirectionMenu();
+});
+function closeCanBitrateMenu(restoreFocus = false) {
+  const menu = document.getElementById('canBitrateMenu');
+  const button = document.getElementById('canBitrateButton');
+  menu.hidden = true;
+  button.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) button.focus();
+}
+function openCanBitrateMenu() {
+  if (document.getElementById('canBitrateButton').disabled) return;
+  closeCanOperationModeMenu();
+  const menu = document.getElementById('canBitrateMenu');
+  const button = document.getElementById('canBitrateButton');
+  menu.hidden = false;
+  button.setAttribute('aria-expanded', 'true');
+  menu.querySelector('[aria-selected="true"]')?.focus();
+}
+document.getElementById('canBitrateButton').addEventListener('click', () => {
+  const menu = document.getElementById('canBitrateMenu');
+  if (menu.hidden) openCanBitrateMenu();
+  else closeCanBitrateMenu();
+});
+document.getElementById('canBitrateButton').addEventListener('keydown', event => {
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    openCanBitrateMenu();
+  }
+});
+document.getElementById('canBitrateMenu').addEventListener('click', event => {
+  const option = event.target.closest('[data-value]');
+  if (!option) return;
+  setCanBitrate(option.dataset.value);
+  closeCanBitrateMenu(true);
+});
+document.getElementById('canBitrateMenu').addEventListener('keydown', event => {
+  const options = [...document.querySelectorAll('#canBitrateMenu [data-value]')];
+  const current = options.indexOf(document.activeElement);
+  let next = current;
+  if (event.key === 'ArrowDown') next = (current + 1) % options.length;
+  else if (event.key === 'ArrowUp') next = (current - 1 + options.length) % options.length;
+  else if (event.key === 'Home') next = 0;
+  else if (event.key === 'End') next = options.length - 1;
+  else if (event.key === 'Escape') { event.preventDefault(); closeCanBitrateMenu(true); return; }
+  else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); document.activeElement.click(); return; }
+  else return;
+  event.preventDefault();
+  options[next].focus();
+});
+document.addEventListener('click', event => {
+  const picker = document.getElementById('canBitratePicker');
+  if (picker && !picker.contains(event.target)) closeCanBitrateMenu();
+});
+setMotorDirection('1');
+async function readCanConfig() {
+  if (!dual || motor !== 1) return;
+  if (!writer) { showCanConfigStatus('Connect to the controller before reading CAN settings.', 'error'); return; }
+  if (canConfigRequestPending && canConfigRequestPending !== 'saved-read') return;
+  if (canConfigRequestPending !== 'saved-read') canConfigRequestPending = 'restore';
+  showCanConfigStatus(canConfigRequestPending === 'saved-read' ? 'CAN settings saved to flash. Reading back the active configuration…' : 'Reading CAN settings from the controller…');
+  await sendCommand('GET_AXIS_CAN');
+}
+document.getElementById('readCanConfigBtn').addEventListener('click', readCanConfig);
+
+document.getElementById('applyCanConfigBtn').addEventListener('click', async () => {
+  if (!writer) { showCanConfigStatus('Connect to the controller before applying CAN settings.', 'error'); return; }
+  if (!canConfigLoaded || canConfigRequestPending) return;
+  const bitrate = document.getElementById('canBitrate').value;
+  if (!['125000','250000','500000','1000000'].includes(bitrate)) { showCanConfigStatus('Choose a supported CAN bitrate.', 'error'); return; }
+  const operationMode = document.getElementById('canOperationMode').value;
+  if (!['0','1','2','3'].includes(operationMode)) { showCanConfigStatus('Choose a CAN operation mode.', 'error'); return; }
+  const rxRaw = document.getElementById('canRxId').value;
+  const txRaw = document.getElementById('canTxId').value;
+  const rxId = parseCanId(rxRaw);
+  const txId = parseCanId(txRaw);
+  if (rxId === null || txId === null) {
+    showCanConfigStatus('Enter each CAN ID as hexadecimal from 0x000 to 0x7FF.', 'error');
+    return;
+  }
+  if (rxId === txId) {
+    showCanConfigStatus('Choose different command and feedback IDs.', 'error');
+    return;
+  }
+  const rxText = '0x' + rxId.toString(16).toUpperCase();
+  const txText = '0x' + txId.toString(16).toUpperCase();
+  document.getElementById('canRxId').value = rxText;
+  document.getElementById('canTxId').value = txText;
+  canConfigRequestPending = 'apply';
+  showCanConfigStatus('Applying and saving CAN settings…');
+  await sendCommand(`SET_AXIS_CAN:${bitrate},${rxText},${txText},${operationMode}`);
+});
+
+document.getElementById('homeBoard').textContent = 'Single Motor';
+
+// Connection owned by the board shell; each panel retains independent state.
+
+async function cleanupConnection() { return globalThis.motorBoard.disconnect(); }
+async function sendCommand(cmd, quiet = false) {
+  try {
+    await globalThis.motorBoard.send(motor, cmd);
+    if (!quiet) log('> ' + cmd);
+  } catch (error) {
+    if (!quiet) log('Command failed: ' + error.message);
+    if (/^(GET_AXIS_CAN|SET_AXIS_CAN:)/.test(cmd)) {
+      canConfigRequestPending = null; showCanConfigStatus('CAN request failed: ' + error.message, 'error');
+    }
+  }
+}
+function setConnected(isConnected) {
+  if (!isConnected) clearCurrentReading('');
+  else clearCurrentReading('Waiting for current data from firmware…');
+  if (!isConnected) resetCanConfig();
+  else if (dual && motor === 1) showCanConfigStatus('Reading saved CAN settings from the board…');
+  if (!isConnected) document.getElementById('positionTuneActual').value = '—';
+  if (!isConnected) {
+  cancelCprMeasurement();
+  lastEncoderCount = null;
+  }
+  if (!isConnected) { directionVerified = false; directionTestActive = false; updateDirectionUI(); setModeDisplay('—'); latestVelocity = null; latestPosition.measured = null; refreshMeasured(); }
+  document.getElementById('statusText').textContent = isConnected ? 'Connected' : 'Connect';
+  document.getElementById('homeConn').textContent = isConnected ? 'Connected' : 'Not connected';
+  if (isConnected) { setActiveUI(isActive); updateDirectionUI(); }
+}
+// TELEM:  "TELEM:t_ms,ref,measured,running,reserved,active,fault_flags,encoder_count"
+// RLS:    "RLS:a,b,tau,K,kp,ki,samples,converged,valid,kff"
+// CONFIG: "CONFIG:cpr,zeta,omega,taud,kp,ki,kff,active,encoder_sign,direction_verified,pos_kp,pos_max_rpm,motor_direction,pos_min_rpm"
+// POSITION: "POSITION:measured,target,error,velocity_ref,at_target"
+let lastEncCpr = null;
+
+// Poll position while either control/tuning page is open, or while recording.
+setInterval(() => {
+  if (!writer) return;
+  if (document.getElementById('page-testing').classList.contains('active') ||
+      document.getElementById('page-tuning').classList.contains('active') || recording) {
+    sendCommand('GET_POSITION', true);
+  }
+}, POSITION_POLL_MS);
+updateDirectionUI();
+
+// ---------------- Control mode (Testing > Reference / Output) ----------------
+let activeControlMode = 'Velocity';     // mode confirmed by firmware
+let selectedControlMode = 'Velocity';   // mode selected in the UI
+const desiredValues = { Velocity: '0', Position: '0' };
+let latestVelocity = null;              // measured RPM from TELEM
+let latestPosition = { measured: null, target: null, error: null, velocityRef: null, atTarget: null };
+
+const MODE_INFO = {
+  Velocity: { unit: 'RPM', button: 'Set Velocity', hint: '', step: '1' },
+  Position: { unit: 'deg', button: 'Set Position', hint: '', step: '1' }
+};
+function selectControlMode(mode) {
+  const input = document.getElementById('desiredInput');
+  desiredValues[selectedControlMode] = input.value;
+  selectedControlMode = mode;
+  input.value = desiredValues[mode];
+  const info = MODE_INFO[mode];
+  document.getElementById('testingVelocityMode').classList.toggle('active', activeControlMode === 'Velocity');
+  document.getElementById('testingPositionMode').classList.toggle('active', activeControlMode === 'Position');
+  document.getElementById('desiredUnit').textContent = info.unit;
+  document.getElementById('setDesiredBtn').textContent = info.button;
+  document.getElementById('desiredHint').innerHTML = info.hint;
+  refreshMeasured();
+}
+// Measured value follows the selected mode: RPM for Velocity, degrees for Position.
+function refreshMeasured() {
+  const isPos = selectedControlMode === 'Position';
+  const v = isPos ? latestPosition.measured : latestVelocity;
+  document.getElementById('measuredInput').value = Number.isFinite(v) ? v.toFixed(isPos ? 2 : 1) : '—';
+  document.getElementById('measuredUnit').textContent = isPos ? 'deg' : 'RPM';
+}
+function setActiveControlMode(mode) {
+  activeControlMode = mode;
+  setModeDisplay(mode);
+  selectControlMode(mode);
+  document.getElementById('testingVelocityMode').classList.toggle('active', mode === 'Velocity');
+  document.getElementById('testingPositionMode').classList.toggle('active', mode === 'Position');
+  document.getElementById('desiredHint').innerHTML = MODE_INFO[mode].hint;
+}
+// Firmware state code carried in the 9th TELEM field (SystemState enum in main.c).
+const FW_MODE_NAMES = { 0: 'Identifying', 1: 'Velocity', 2: 'Direction test', 3: 'Position' };
+function setModeDisplay(text) { document.getElementById('motorsStatusMode').textContent = text; }
+function setFirmwareMode(code) {
+  if (!Number.isInteger(code) || !(code in FW_MODE_NAMES)) return;   // older firmware: field absent
+  setModeDisplay(FW_MODE_NAMES[code]);
+  if (code === 1 && activeControlMode !== 'Velocity') setActiveControlMode('Velocity');
+  else if (code === 3 && activeControlMode !== 'Position') setActiveControlMode('Position');
+}
+function acceptPositionResponse(payload) {
+  const p = payload.split(',').map(v => v.trim());
+  if (p.length < 4) { cliEcho('Malformed POSITION response: ' + payload, 'err'); return; }
+  const nums = p.slice(0, 4).map(Number);
+  if (nums.some(v => !Number.isFinite(v))) return;
+  latestPosition.measured = nums[0]; latestPosition.target = nums[1]; latestPosition.error = nums[2]; latestPosition.velocityRef = nums[3];
+  document.getElementById('positionTuneActual').value = nums[0].toFixed(2);
+  latestPosition.atTarget = p.length >= 5 ? (p[4] === '1' || p[4].toLowerCase() === 'true') : null;
+  if (recording) recordSample({
+    record_type: 'POSITION', t_s: lastTelemetryTime,
+    target_position_deg: latestPosition.target, measured_position_deg: latestPosition.measured,
+    position_error_deg: latestPosition.error, position_velocity_reference_rpm: latestPosition.velocityRef,
+    at_target: latestPosition.atTarget ? 1 : 0
+  });
+  if (selectedControlMode === 'Position') refreshMeasured();
+  const nowSec = performance.now() / 1000;
+  if (document.getElementById('page-testing').classList.contains('active')) {
+    posChart.add(nowSec, nums[1], nums[0]);
+  }
+  if (document.getElementById('page-tuning').classList.contains('active')) {
+    posTuneChart.add(nowSec, nums[1], nums[0]);
+  }
+}
+document.getElementById('testingVelocityMode').addEventListener('click', () => {
+  selectControlMode('Velocity');
+  sendCommand('SET_MODE:VELOCITY');
+});
+document.getElementById('testingPositionMode').addEventListener('click', () => {
+  selectControlMode('Position');
+  sendCommand('SET_MODE:POSITION');
+});
+document.getElementById('setDesiredBtn').addEventListener('click', () => {
+  const raw = document.getElementById('desiredInput').value.trim();
+  const value = Number(raw);
+  if (raw === '' || !Number.isFinite(value)) {
+    alert(selectedControlMode === 'Position' ? 'Enter a valid position in degrees.' : 'Enter a valid velocity in RPM.');
+    return;
+  }
+  if (selectedControlMode === 'Position') {
+    if (value < 0 || value > 360) { alert('Enter an angle from 0 to 360 degrees (360 is one full turn from zero).'); return; }
+    document.getElementById('desiredInput').value = value;
+    sendCommand('SET_POSITION:' + value);
+  } else sendCommand('SET_DESIRED:' + value);
+});
+let pendingPosKp = null;
+document.getElementById('setPosKpBtn').addEventListener('click', () => {
+  const v = Number(document.getElementById('posKpInput').value);
+  if (!Number.isFinite(v) || v < 0) { alert('Position Kp must be non-negative.'); return; }
+  pendingPosKp = v;
+  sendCommand('SET_POS_KP:' + v);
+});
+document.getElementById('setPosMaxRpmBtn').addEventListener('click', () => {
+  const v = Number(document.getElementById('posMaxRpmInput').value);
+  if (!Number.isFinite(v) || v <= 0 || v > 300) { alert('Maximum velocity must be greater than 0 and no more than 300 RPM.'); return; }
+  sendCommand('SET_POS_MAX_RPM:' + v);
+});
+document.getElementById('setPosMinRpmBtn').addEventListener('click', () => {
+  const raw = document.getElementById('posMinRpmInput').value.trim();
+  const v = Number(raw);
+  if (!raw || !Number.isFinite(v) || v < -300 || v > 0) { alert('Minimum velocity must be between -300 RPM and 0 RPM.'); return; }
+  sendCommand('SET_POS_MIN_RPM:' + v);
+});
+document.getElementById('setPositionTuneTargetBtn').addEventListener('click', async () => {
+  if (!writer) { alert('Connect to the controller first.'); return; }
+  const raw = document.getElementById('positionTuneTargetInput').value.trim();
+  const target = Number(raw);
+  if (!raw || !Number.isFinite(target) || target < 0 || target > 360) {
+    alert('Enter an angle from 0 to 360 degrees (360 is one full turn from zero).'); return;
+  }
+  posTuneChart.clear();
+  document.getElementById('positionTuneStatus').textContent = 'Switching to Position mode and applying target...';
+  await sendCommand('SET_MODE:POSITION');
+  await sendCommand('SET_POSITION:' + target);
+  document.getElementById('positionTuneTargetInput').value = target;
+  document.getElementById('positionTuneStatus').textContent = 'Position test requested: target ' + target + ' deg. Continuous position: 360 deg is one full turn from zero.';
+});
+
+let lastCurrentUpdate = null;
+function clearCurrentReading(message) {
+  lastCurrentUpdate = null;
+  currentChart.clear();
+  document.getElementById('sensorCurrent').value = '—';
+  document.getElementById('sensorCurrentStatus').textContent = message;
+}
+setInterval(() => {
+  if (lastCurrentUpdate !== null && performance.now() - lastCurrentUpdate > 2000) clearCurrentReading('Current data is stale. Check the connection or firmware.');
+}, 500);
+function acceptCurrentResponse(payload) {
+  const fields = payload.split(',');
+  if (fields.length !== 5 || fields.some(value => value.trim() === '')) { clearCurrentReading('Invalid current data from firmware.'); return; }
+  const [amps, volts, adc, offset, status] = fields.map(Number);
+  if (![amps,volts,adc,offset,status].every(Number.isFinite) || ![0,1,2,3].includes(status) || amps < 0 || volts < 0 || volts > 3.301 || adc < 0 || adc > 4095 || offset < 0 || offset > 3.3) {
+    clearCurrentReading('Invalid current data from firmware.'); return;
+  }
+  if (status === 1 || status === 3) {
+    clearCurrentReading(status === 3 ? 'ADC/DMA fault. Current unavailable.' : 'Waiting for fresh ADC data.'); return;
+  }
+  lastCurrentUpdate = performance.now();
+  if (status === 0) currentChart.add(lastCurrentUpdate / 1000, 0, amps);
+  else currentChart.clear();
+  document.getElementById('sensorCurrent').value = status === 2 ? 'Out of range' : amps.toFixed(3) + ' A';
+  document.getElementById('sensorCurrentStatus').textContent = status === 2 ? 'ADC input reached full scale; current cannot be measured accurately.' : '';
+}
+
+function handleLine(line) {
+  if (line.startsWith('CURRENT:')) { acceptCurrentResponse(line.substring(8)); return; }
+  if (line.startsWith('POSITION:')) { acceptPositionResponse(line.substring(9)); return; }
+  if (line.startsWith('CAN_CONFIG:')) {
+    const savedToFlash = canConfigRequestPending === 'saved-read';
+    const restored = canConfigRequestPending === 'restore';
+    canConfigLoaded = false;
+    canConfigRequestPending = null;
+    const [bitrateRaw, rxRaw, txRaw, modeRaw] = line.substring(11).split(',').map(value => value.trim());
+    if (!['0','1','2','3'].includes(modeRaw)) {
+      showCanConfigStatus('Firmware does not report the independent CAN mode. Install the matching standard-CAN firmware.', 'error'); return;
+    }
+    const bitrate = String(Number(bitrateRaw));
+    const rxId = parseCanId(rxRaw || '');
+    const txId = parseCanId(txRaw || '');
+    const bitrateSelect = document.getElementById('canBitrate');
+    if (![...bitrateSelect.options].some(option => option.value === bitrate) || rxId === null || txId === null || rxId === txId) {
+      showCanConfigStatus('Controller returned invalid or unsupported CAN settings: ' + line, 'error');
+      return;
+    }
+    if (!setCanBitrate(bitrate)) { showCanConfigStatus('Controller returned an unsupported bitrate.', 'error'); return; }
+    document.getElementById('canRxId').value = '0x' + rxId.toString(16).toUpperCase();
+    document.getElementById('canTxId').value = '0x' + txId.toString(16).toUpperCase();
+    setCanOperationMode(modeRaw);
+
+    canConfigLoaded = true;
+    showCanConfigStatus(savedToFlash ? 'CAN settings saved to flash and confirmed by the board.' : restored ? 'Saved board settings restored. Unsaved edits discarded.' : 'Saved CAN settings loaded from the board.', 'success');
+    return;
+  }
+  if (line.startsWith('SENSOR_CONFIG:')) {
+    const [cprRaw, signRaw, verifiedRaw, motorDirectionRaw] = line.substring(14).split(',').map(value => value.trim());
+    const cpr = Number(cprRaw), sign = Number(signRaw), verified = verifiedRaw === '1';
+    if (!Number.isFinite(cpr) || cpr <= 0 || (sign !== 1 && sign !== -1)) {
+      setConfigActionStatus('Firmware returned invalid sensor settings.', true);
+      return;
+    }
+    document.getElementById('sensorEncCpr').textContent = cpr.toFixed(2);
+    lastEncCpr = cpr;
+    document.getElementById('directionSign').textContent = sign < 0 ? '-1' : '+1';
+    if (motorDirectionRaw !== undefined && (Number(motorDirectionRaw) === 1 || Number(motorDirectionRaw) === -1)) {
+      setMotorDirection(Number(motorDirectionRaw) < 0 ? '-1' : '1');
+    }
+    directionVerified = verified;
+    updateDirectionUI();
+    tabConfigRequestPending = null;
+    setConfigActionStatus('Sensor settings restored from flash.', false, 'sensors');
+    cliEcho(line, 'rx');
+    return;
+  }
+  if (line.startsWith('TUNING_CONFIG:')) {
+    const values = line.substring(14).split(',').map(Number);
+    if (values.length < 10 || values.slice(0, 10).some(value => !Number.isFinite(value))) {
+      setConfigActionStatus('Firmware returned invalid tuning settings.', true);
+      return;
+    }
+    const [zeta, omega, taud, kp, ki, kff, posKp, posMaxRpm, gainsValid, posMinRpm] = values;
+    document.getElementById('m1ZetaInput').value = zeta;
+    document.getElementById('m1OmegaInput').value = omega;
+    document.getElementById('m1TauDInput').value = taud;
+    document.getElementById('posKpInput').value = posKp;
+    document.getElementById('posGainKp').value = posKp;
+    document.getElementById('posMaxRpmInput').value = posMaxRpm;
+    document.getElementById('posMinRpmInput').value = posMinRpm;
+    if (gainsValid === 1) {
+      document.getElementById('m1GainKp').value = kp.toFixed(4);
+      document.getElementById('m1GainKi').value = ki.toFixed(4);
+      document.getElementById('m1GainKff').value = kff.toFixed(4);
+      document.getElementById('m1RlsKp').textContent = kp.toFixed(4);
+      document.getElementById('m1RlsKi').textContent = ki.toFixed(4);
+      document.getElementById('m1RlsKff').textContent = kff.toFixed(4);
+      identifiedGains = { kp, ki, kff };
+    } else {
+      document.getElementById('m1GainKp').value = '';
+      document.getElementById('m1GainKi').value = '';
+      document.getElementById('m1GainKff').value = '';
+      identifiedGains = null;
+    }
+    lastConfig = { ...(lastConfig || {}), zeta, omega, taud, kp, ki, kff, posKp, posMaxRpm, posMinRpm };
+    tabConfigRequestPending = null;
+    setConfigActionStatus('Tuning settings restored from flash.', false, 'tuning');
+    cliEcho(line, 'rx');
+    return;
+  }
+  if (line === 'OK:SENSOR_SAVED') {
+    setConfigActionStatus('Sensor settings saved to flash.', false, 'sensors');
+    document.getElementById('cprCalibrationStatus').textContent =
+      'CPR and sensor settings successfully saved to flash.';
+    tabConfigRequestPending = null;
+    cliEcho(line, 'rx');
+    return;
+  }
+  if (line === 'OK:TUNING_SAVED') { setConfigActionStatus('Tuning settings saved to flash.', false, 'tuning'); tabConfigRequestPending = null; cliEcho(line, 'rx'); return; }
+  if (line === 'ERR:NO_SAVED_CONFIG') { const section = tabConfigRequestPending?.endsWith('sensors') ? 'sensors' : 'tuning'; tabConfigRequestPending = null; setConfigActionStatus('No saved settings are available for this section yet.', true, section); return; }
+  if (line === 'ERR:CONFIG_BUSY') {
+    document.getElementById('motorDirectionStatus').textContent = 'Settings rejected while busy. Stop the test and stop before applying direction.';
+    const section = tabConfigRequestPending?.endsWith('sensors') ? 'sensors' : (tabConfigRequestPending ? 'tuning' : null); tabConfigRequestPending = null; setConfigActionStatus('Stop identification or direction testing and stop the motor first.', true, section); return;
+  }
+  if (line === 'ERR:SAVE_FAILED') {
+    const section = tabConfigRequestPending
+      ? (tabConfigRequestPending.endsWith('sensors') ? 'sensors' : 'tuning')
+      : activeConfigSection();
+    tabConfigRequestPending = null;
+    if (section) setConfigActionStatus('Flash write failed. The saved settings were not confirmed.', true, section);
+    else cliEcho('Flash write failed. The saved settings were not confirmed.', 'rx');
+    return;
+  }
+  if (line === 'ERR:UNKNOWN_CMD' && tabConfigRequestPending) { const section = tabConfigRequestPending.endsWith('sensors') ? 'sensors' : 'tuning'; tabConfigRequestPending = null; setConfigActionStatus('This firmware does not support Restore/Save by tab yet. Update the firmware first.', true, section); return; }
+  if (line === 'OK:POSITION_MODE') { setActiveControlMode('Position'); return; }
+  if (line === 'OK:VELOCITY_MODE') { setActiveControlMode('Velocity'); return; }
+  if (line === 'OK:CAN_CONFIG') { canConfigRequestPending = 'saved-read'; showCanConfigStatus('CAN settings saved to flash. Reading back the active configuration…'); readCanConfig(); return; }
+  if (line === 'ERR:CAN_BUSY_STOP') { canConfigRequestPending = null; showCanConfigStatus('Stop both motors before applying and saving CAN settings.', 'error'); return; }
+  if (line === 'ERR:BAD_CAN_CONFIG') { canConfigRequestPending = null; showCanConfigStatus('Use different standard RX and TX IDs from 0x000 to 0x7FF.', 'error'); return; }
+  if (line === 'ERR:CAN_CONFIG_FAILED') { canConfigRequestPending = null; showCanConfigStatus('Applying or saving CAN settings failed. Read back the active settings before continuing.', 'error'); return; }
+  if (line === 'ERR:UNKNOWN_CMD' && canConfigRequestPending) { canConfigRequestPending = null; showCanConfigStatus('This firmware does not support CAN settings over USB yet. Update the controller firmware with the CAN configuration handler.', 'error'); return; }
+  if (line === 'OK:ZETA' || line === 'OK:OMEGA_N') { sendCommand('GET_CONFIG', true); cliEcho(line + ' — readback requested', 'rx'); return; }
+  if (line === 'ERR:BAD_ZETA') { alert('ζ must be greater than 0.'); return; }
+  if (line === 'ERR:BAD_OMEGA_N') { alert('ωₙ must be greater than 0.'); return; }
+  if (line === 'OK:CPR' || line === 'OK:POS_KP' || line === 'OK:POS_MAX_RPM' || line === 'OK:POS_MIN_RPM') { sendCommand('GET_CONFIG', true); cliEcho(line + ' — readback requested', 'rx'); return; }
+  if (line === 'ERR:BAD_POS_MIN_RPM') { alert('Minimum velocity must be between -300 RPM and 0 RPM.'); return; }
+  if (line === 'OK:SAVED') { cliEcho('Configuration saved to flash.', 'rx'); sendCommand('GET_CONFIG', true); return; }
+  if (line.startsWith('POS_CONFIG:')) {
+    const v = line.substring(11).split(',');
+    if (v.length >= 2) {
+      if (Number.isFinite(Number(v[0]))) { document.getElementById('posKpInput').value = Number(v[0]); document.getElementById('posGainKp').value = Number(v[0]); }
+      if (Number.isFinite(Number(v[1]))) document.getElementById('posMaxRpmInput').value = Number(v[1]);
+    }
+    cliEcho(line, 'rx'); return;
+  }
+  if (line.startsWith('TELEM:')) {
+    const parts = line.substring(6).split(',');
+    if (parts.length < 8) { log('Malformed TELEM line, dropped: ' + line); return; }
+    const [t, ref, vel, running, , active, fault, encCount, modeCode] = parts;
+    const refN = parseFloat(ref), velN = parseFloat(vel), tN = parseFloat(t) / 1000;
+    if (!isFinite(refN) || !isFinite(velN) || !isFinite(tN)) { return; }
+
+    const activeNow = active === '1';
+    const faultBits = parseInt(fault, 10) || 0;
+    const encoderCountN = parseInt(encCount, 10);
+    if (Number.isFinite(encoderCountN)) {
+      updateCprMeasurement(encoderCountN);
+    }
+    const firmwareMode = parseInt(modeCode, 10);
+    lastTelemetryTime = tN;
+
+    setFirmwareMode(firmwareMode);
+    latestVelocity = velN;
+    if (selectedControlMode === 'Velocity') refreshMeasured();
+    const modeName = FW_MODE_NAMES[firmwareMode];
+    const stateStr = !activeNow
+      ? 'STOPPED'
+      : (modeName ? modeName.toUpperCase() : (running === '1' ? 'RUN' : 'NOT RUNNING'));
+    document.getElementById('homeState').textContent = stateStr;
+
+    setActiveUI(active === '1');
+    setFaultUI(faultBits);
+    if (document.getElementById('page-testing').classList.contains('active')) {
+      velChart.add(tN, refN, velN);
+    }
+    if (activeNow && !recording) startLogRun(tN);
+    if (recording) {
+      recordSample({
+        record_type: 'TELEM', t_s: tN, control_mode: activeControlMode,
+        firmware_state: FW_MODE_NAMES[firmwareMode] || '', running: Number(running) || 0,
+        active: activeNow ? 1 : 0, fault_flags: faultBits,
+        encoder_count: Number.isFinite(encoderCountN) ? encoderCountN : '',
+        velocity_reference_rpm: refN, measured_velocity_rpm: velN,
+        target_position_deg: latestPosition.target, measured_position_deg: latestPosition.measured,
+        position_error_deg: latestPosition.error, position_velocity_reference_rpm: latestPosition.velocityRef,
+        at_target: latestPosition.atTarget
+      });
+      if (!activeNow) finishLogRun(faultBits ? 'Fault / stop' : 'Stopped', faultBits);
+    }
+    if (document.getElementById('page-blackbox').classList.contains('active')) {
+      logRunChart.add(tN, refN, velN);
+    }
+    const encN = parseInt(encCount, 10);
+    if (isFinite(encN) && document.getElementById('page-sensors').classList.contains('active')) {
+      document.getElementById('sensorEncCount').textContent = encN;
+      document.getElementById('sensorEncUpdated').textContent = new Date().toLocaleTimeString();
+      sensorEncChart.add(tN, null, encN);
+      }
+    return;
+  }
+  if (line.startsWith('ENC:')) {
+    const [countStr, cprStr] = line.substring(4).split(',');
+    const count = parseInt(countStr, 10), cpr = parseFloat(cprStr);
+    if (Number.isFinite(count)) updateCprMeasurement(count);
+    if (document.getElementById('page-sensors').classList.contains('active')) {
+      if (isFinite(count)) { document.getElementById('sensorEncCount').textContent = count; }
+      if (isFinite(cpr)) {
+        lastEncCpr = cpr;
+        document.getElementById('sensorEncCpr').textContent = cpr.toFixed(2);
+      }
+      document.getElementById('sensorEncUpdated').textContent = new Date().toLocaleTimeString();
+    } else if (isFinite(cpr)) {
+      lastEncCpr = cpr;
+    }
+    cliEcho(line, 'rx');
+    return;
+  }
+  if (line.startsWith('VERSION:')) {
+    const [ver, board] = line.substring(8).split(',');
+    document.getElementById('sideVersion').textContent = ver || '-';
+    document.getElementById('homeVersion').textContent = (ver || '-') + (board ? (' (' + board + ')') : '');
+    return;
+  }
+  if (line.startsWith('TAUD:')) {
+    document.getElementById('m1TauDInput').value = line.substring(5).trim();
+    cliEcho(line, 'rx');
+    return;
+  }
+  if (line.startsWith('CONFIG:')) {
+    const parts = line.substring(7).split(',');
+    if (parts.length >= 8) {
+      const [cpr, zeta, omega, taud, kp, ki, kff, active, encoderSign, directionVerifiedField, posKp, posMaxRpm, motorDirection, posMinRpm] = parts;
+      lastConfig = {
+        cpr: parseFloat(cpr), zeta: parseFloat(zeta), omega: parseFloat(omega), taud: parseFloat(taud),
+        kp: parseFloat(kp), ki: parseFloat(ki), kff: parseFloat(kff),
+        active: active === '1',
+        encoderSign: parseInt(encoderSign, 10),
+        directionVerified: directionVerifiedField === '1',
+        posKp: posKp === undefined ? undefined : parseFloat(posKp),
+        posMaxRpm: posMaxRpm === undefined ? undefined : parseFloat(posMaxRpm),
+        motorDirection: motorDirection === undefined ? 1 : parseInt(motorDirection, 10),
+        posMinRpm: posMinRpm === undefined ? -(parseFloat(posMaxRpm) || 300) : parseFloat(posMinRpm)
+      };
+      if (recording) recordSample({
+        record_type: 'CONFIG', t_s: lastTelemetryTime,
+        encoder_cpr: lastConfig.cpr, zeta: lastConfig.zeta, omega_n: lastConfig.omega, tau_d_s: lastConfig.taud,
+        velocity_kp: lastConfig.kp, velocity_ki: lastConfig.ki, velocity_kff: lastConfig.kff,
+        encoder_sign: lastConfig.encoderSign, direction_verified: lastConfig.directionVerified ? 1 : 0,
+        motor_direction: lastConfig.motorDirection, position_kp: lastConfig.posKp,
+        position_max_rpm: lastConfig.posMaxRpm, position_min_rpm: lastConfig.posMinRpm
+      });
+
+      if (isFinite(lastConfig.cpr)) {
+        lastEncCpr = lastConfig.cpr;
+        document.getElementById('sensorEncCpr').textContent = lastConfig.cpr.toFixed(2);
+      }
+      if (isFinite(lastConfig.zeta)) document.getElementById('m1ZetaInput').value = lastConfig.zeta;
+      if (isFinite(lastConfig.omega)) document.getElementById('m1OmegaInput').value = lastConfig.omega;
+      if (isFinite(lastConfig.taud)) document.getElementById('m1TauDInput').value = lastConfig.taud;
+      if (Number.isFinite(lastConfig.posKp)) { document.getElementById('posKpInput').value = lastConfig.posKp; document.getElementById('posGainKp').value = lastConfig.posKp; }
+      if (Number.isFinite(lastConfig.posMaxRpm)) document.getElementById('posMaxRpmInput').value = lastConfig.posMaxRpm;
+      if (Number.isFinite(lastConfig.posMinRpm)) document.getElementById('posMinRpmInput').value = lastConfig.posMinRpm;
+      setMotorDirection(lastConfig.motorDirection < 0 ? '-1' : '1');
+      document.getElementById('motorDirectionStatus').textContent =
+        'Firmware direction: ' + (lastConfig.motorDirection < 0 ? 'Reversed' : 'Normal');
+
+      if (isFinite(lastConfig.kp)) {
+        document.getElementById('m1RlsKp').textContent = lastConfig.kp.toFixed(4);
+        document.getElementById('m1GainKp').value = lastConfig.kp.toFixed(4);
+      }
+      if (isFinite(lastConfig.ki)) {
+        document.getElementById('m1RlsKi').textContent = lastConfig.ki.toFixed(4);
+        document.getElementById('m1GainKi').value = lastConfig.ki.toFixed(4);
+      }
+      if (isFinite(lastConfig.kff)) {
+        document.getElementById('m1RlsKff').textContent = lastConfig.kff.toFixed(4);
+        document.getElementById('m1GainKff').value = lastConfig.kff.toFixed(4);
+      }
+      if (isFinite(lastConfig.kp) && isFinite(lastConfig.ki) && isFinite(lastConfig.kff)) {
+        identifiedGains = { kp: lastConfig.kp, ki: lastConfig.ki, kff: lastConfig.kff };
+      }
+      setActiveUI(lastConfig.active);
+      if (isFinite(lastConfig.encoderSign)) document.getElementById('directionSign').textContent = lastConfig.encoderSign < 0 ? '-1' : '+1';
+      if (parts.length >= 10) { directionVerified = directionVerifiedField === '1'; updateDirectionUI(); }
+    }
+    document.getElementById('configPreview').textContent = JSON.stringify(lastConfig, null, 2);
+    cliEcho(line, 'rx');
+    return;
+  }
+  if (line.startsWith('CPR:')) {
+    const cpr = line.substring(4).trim();
+    const cprN = parseFloat(cpr);
+    if (isFinite(cprN)) {
+      lastEncCpr = cprN;
+      document.getElementById('sensorEncCpr').textContent = cprN.toFixed(2);
+    }
+    return;
+  }
+  if (line.startsWith('RLS:')) {
+    const parts = line.substring(4).split(',');
+    if (parts.length < 10) { log('Malformed RLS line, dropped: ' + line); return; }
+
+    const [a, b, tau, K, kp, ki, samples, converged, valid, kff] = parts;
+    const aN = parseFloat(a), bN = parseFloat(b), tauN = parseFloat(tau), KN = parseFloat(K);
+    const kpN = parseFloat(kp), kiN = parseFloat(ki), kffN = parseFloat(kff);
+    const samplesN = parseInt(samples, 10);
+
+    if (recording) recordSample({
+      record_type: 'RLS', t_s: lastTelemetryTime,
+      rls_a: aN, rls_b: bN, rls_tau_s: tauN, rls_motor_gain_K: KN,
+      velocity_kp: kpN, velocity_ki: kiN, velocity_kff: kffN,
+      rls_samples: samplesN, rls_converged: converged, rls_valid: valid
+    });
+
+    document.getElementById('m1RlsA').textContent = isFinite(aN) ? aN.toFixed(4) : '-';
+    document.getElementById('m1RlsB').textContent = isFinite(bN) ? bN.toFixed(4) : '-';
+    document.getElementById('m1RlsK').textContent = isFinite(KN) ? KN.toFixed(4) : '-';
+    document.getElementById('m1RlsTau').textContent = isFinite(tauN) ? tauN.toFixed(4) : '-';
+    document.getElementById('m1RlsKp').textContent = isFinite(kpN) ? kpN.toFixed(4) : '-';
+    document.getElementById('m1RlsKi').textContent = isFinite(kiN) ? kiN.toFixed(4) : '-';
+    document.getElementById('m1RlsKff').textContent = isFinite(kffN) ? kffN.toFixed(4) : '-';
+    document.getElementById('m1RlsSamples').textContent = isFinite(samplesN) ? samplesN : '-';
+
+    const isConverged = (converged === '1' && valid === '1');
+    if (isConverged) {
+      if (isFinite(kpN)) document.getElementById('m1GainKp').value = kpN.toFixed(4);
+      if (isFinite(kiN)) document.getElementById('m1GainKi').value = kiN.toFixed(4);
+      if (isFinite(kffN)) document.getElementById('m1GainKff').value = kffN.toFixed(4);
+    }
+    document.getElementById('m1ConvergeBadge').textContent = isConverged ? 'converged' : 'not converged';
+    if (isConverged) {
+      identifiedGains = { kp: kpN, ki: kiN, kff: kffN };
+      document.getElementById('m1TuneStatus').textContent = 'Converged — gains applied';
+    }
+    return;
+  }
+  if (!line.startsWith('DIRTEST:')) {
+    log('< ' + line);
+  }
+
+  if (line.startsWith('DIRTEST:')) {
+    const parts = line.substring(8).split(',');
+    if (parts.length >= 6) {
+      const ref = parseFloat(parts[0]);
+      const omega = parseFloat(parts[1]);
+      const sign = parseInt(parts[2], 10);
+      const match = parts[3] === '1';
+      const verified = parts[4] === '1';
+      const active = parts[5] === '1';
+      directionTestActive = active;
+
+      if (recording) recordSample({
+        record_type: 'DIRTEST', t_s: lastTelemetryTime,
+        direction_test_reference_pct: ref, direction_test_omega_rpm: omega,
+        encoder_sign: sign, direction_match: match ? 1 : 0,
+        direction_verified: verified ? 1 : 0, direction_test_active: active ? 1 : 0
+      });
+
+      if (isFinite(ref)) document.getElementById('directionReference').textContent = ref.toFixed(1) + ' %';
+      if (isFinite(omega)) document.getElementById('directionOmega').textContent = omega.toFixed(2) + ' RPM';
+      document.getElementById('directionSign').textContent = sign < 0 ? '-1' : '+1';
+
+      const result = document.getElementById('directionResult');
+      const status = document.getElementById('directionStatus');
+      const detail = document.getElementById('directionDetail');
+
+      result.classList.remove('ok', 'bad');
+      if (match && Math.abs(omega) >= 5 && Math.abs(ref) >= 1) {
+        result.classList.add('ok');
+        status.textContent = 'Direction OK';
+        detail.textContent = 'Reference and Output have the same sign.';
+      } else if (!match && Math.abs(omega) >= 5 && Math.abs(ref) >= 1) {
+        result.classList.add('bad');
+        status.textContent = 'Direction reversed';
+        detail.textContent = 'Reference and Output have different signs. Flip the encoder sign.';
+      } else {
+        status.textContent = active ? 'Test running — waiting for motion...' : 'Test stopped';
+        detail.textContent = 'Start the test to apply the selected duty and inspect encoder feedback.';
+      }
+
+      directionVerified = verified;
+      updateDirectionUI();
+      document.getElementById('directionStopBtn').disabled = !active;
+      document.getElementById('directionStartBtn').disabled = !writer || active;
+      document.getElementById('flipEncoderBtn').disabled = !active;
+      document.getElementById('confirmDirectionBtn').disabled = !(match && Math.abs(omega) >= 5 && Math.abs(ref) >= 1);
+    }
+    return;
+  }
+  if (line.startsWith('TUNE_RESULT:')) {
+    identificationActive = false;
+    const parts = line.substring(12).split(',');
+    const status = document.getElementById('m1TuneStatus');
+    if (parts.length >= 3) {
+      const kp = parseFloat(parts[0]), ki = parseFloat(parts[1]), kff = parseFloat(parts[2]);
+      if (isFinite(kp) && isFinite(ki) && isFinite(kff)) {
+        identifiedGains = { kp, ki, kff };
+        document.getElementById('m1RlsKp').textContent = kp.toFixed(4);
+        document.getElementById('m1RlsKi').textContent = ki.toFixed(4);
+        document.getElementById('m1RlsKff').textContent = kff.toFixed(4);
+        document.getElementById('m1GainKp').value = kp.toFixed(4);
+        document.getElementById('m1GainKi').value = ki.toFixed(4);
+        document.getElementById('m1GainKff').value = kff.toFixed(4);
+        status.textContent = 'Converged — gains applied';
+      } else {
+        status.textContent = 'Tune result invalid';
+      }
+    } else {
+      status.textContent = 'Tune result invalid';
+    }
+    return;
+  }
+  if (line === 'ERR:TUNE_FAILED') {
+    identificationActive = false;
+    setActiveUI(false);
+    document.getElementById('m1TuneStatus').textContent = 'Identification failed';
+    return;
+  }
+  if (line === 'OK:DIRECTION_CONFIRMED') {
+    // The firmware leaves direction-test mode on confirm and stops sending
+    // DIRTEST lines, so this reply is the only signal that it is verified.
+    directionVerified = true;
+    directionTestActive = false;
+    updateDirectionUI();
+    const result = document.getElementById('directionResult');
+    result.classList.remove('bad');
+    result.classList.add('ok');
+    document.getElementById('directionStatus').textContent = 'Direction confirmed';
+    document.getElementById('directionDetail').textContent = 'Direction test confirmed. Closed-loop control is available with valid gains.';
+    document.getElementById('directionStartBtn').disabled = !writer;
+    document.getElementById('directionStopBtn').disabled = true;
+    document.getElementById('flipEncoderBtn').disabled = true;
+    document.getElementById('confirmDirectionBtn').disabled = true;
+    sendCommand('GET_CONFIG');   // resync sign / flags from the board
+  }
+  if (line === 'OK:ENCODER_SIGN_FLIPPED') {
+    directionVerified = false;
+    directionTestActive = false;
+    document.getElementById('directionStartBtn').disabled = !writer;
+    document.getElementById('directionStopBtn').disabled = true;
+    document.getElementById('flipEncoderBtn').disabled = true;
+    updateDirectionUI();
+    sendCommand('GET_CONFIG');
+  }
+  if (line === 'OK:POS_KP' && pendingPosKp !== null) document.getElementById('posGainKp').value = pendingPosKp;
+  if (line === 'OK:SAVED') log('Gains saved.');
+  if (line === 'ERR:SAVE_FAILED') log('Save failed.');
+
+  if (line === 'OK:POSITION_SET' || line === 'OK:POSITION_UPDATED') setActiveControlMode('Position');
+  if (line === 'OK:STOPPED') setActiveUI(false);
+  if (line === 'OK:MOTOR_DIRECTION' || line === 'OK:MOTOR_DIRECTION_UNCHANGED') {
+    document.getElementById('motorDirectionStatus').textContent = 'Firmware confirmed direction. Reading back settings…';
+    sendCommand('GET_CONFIG');
+    log('Firmware confirmed motor direction.');
+    return;
+  }
+  if (line === 'OK:DIRECTION_TEST_STARTED') { directionTestActive = true; setActiveUI(isActive); document.getElementById('directionStartBtn').disabled = true; document.getElementById('directionStopBtn').disabled = false; document.getElementById('directionStatus').textContent = 'Test running'; return; }
+  if (line === 'OK:DIRECTION_TEST_STOPPED') { directionTestActive = false; setActiveUI(isActive); document.getElementById('directionStartBtn').disabled = !writer; document.getElementById('directionStopBtn').disabled = true; document.getElementById('flipEncoderBtn').disabled = true; document.getElementById('confirmDirectionBtn').disabled = true; document.getElementById('directionStatus').textContent = 'Test stopped — motor remains active'; return; }
+  if (line === 'ERR:NO_GAINS') alert('Normal control is unavailable because valid gains are not available. Run motor identification or check the saved gains.');
+
+}
+
+// ---------------- Active / fault UI ----------------
+function setActiveUI(active) {
+  if (active) cancelCprMeasurement();
+  isActive = active;
+  document.getElementById('sideActive').textContent = active ? 'YES' : 'NO';
+  document.getElementById('sideActive').classList.toggle('active', active);
+  document.getElementById('homeActive').textContent = active ? 'YES' : 'NO';
+  document.getElementById('motorActiveLabel').textContent = active ? 'ACTIVE' : 'STOPPED';
+  document.getElementById('setDesiredBtn').disabled = !writer;
+  document.getElementById('setPosKpBtn').disabled = !writer;
+  document.getElementById('setPosMaxRpmBtn').disabled = !writer;
+  document.getElementById('setPosMinRpmBtn').disabled = !writer;
+  document.getElementById('setPositionTuneTargetBtn').disabled = !writer;
+  document.getElementById('directionStartBtn').disabled = !writer || directionTestActive;
+  document.getElementById('stopBtn').disabled = !writer;
+  document.getElementById('applyMotorDirectionBtn').disabled = active || directionTestActive || !writer;
+  document.getElementById('motorDirectionSelect').disabled =
+    active || directionTestActive || !writer;
+  document.getElementById('motorDirectionButton').disabled =
+    active || directionTestActive || !writer;
+  if (active || directionTestActive || !writer) closeMotorDirectionMenu();
+}
+function setFaultUI(bits) {
+  const names = [];
+  if (bits & 0x01) names.push('identify-timeout');
+  if (bits & 0x02) names.push('bad-gains-rejected');
+  const text = names.join(', ') || 'none';
+  const el = document.getElementById('sideFault');
+  el.textContent = text;
+  el.classList.toggle('fault', names.length > 0);
+  document.getElementById('motorFaultLabel').textContent = text;
+}
+
+// ---------------- Direction gate UI ----------------
+function updateDirectionUI() {
+  const gate = document.getElementById('directionGate');
+  const controlGate = document.getElementById('motorControlGate');
+  const tuningGate = document.getElementById('tuningGate');
+  const tuneBtn = document.getElementById('m1TuneBtn');
+
+  if (directionVerified) {
+    gate.className = 'verified-note';
+    gate.textContent = 'Direction test confirmed. This status is informational; the test is optional.';
+    controlGate.className = 'verified-note';
+    controlGate.textContent = 'Direction test confirmed. Closed-loop control is available with valid gains.';
+    tuningGate.className = 'verified-note';
+    tuningGate.textContent = 'After successful identification, set a position target directly.';
+  } else {
+    gate.className = 'gate-note';
+    gate.textContent = 'Direction test has not been run; it is optional.';
+    controlGate.className = 'gate-note';
+    controlGate.textContent = 'Direction testing is optional. Use closed-loop control when you are confident the saved encoder sign is correct.';
+    tuningGate.className = 'gate-note';
+    tuningGate.textContent = dual
+      ? 'Direction testing is optional. New gains are available after identification. Flash saving waits until both motors are stopped.'
+      : 'Direction testing is optional. Normal control requires valid gains.';
+  }
+  tuneBtn.disabled = !writer;
+  document.getElementById('directionStartBtn').disabled = !writer || directionTestActive;
+}
+
+// ---------------- Motor Setup: direction test ----------------
+document.getElementById('directionStartBtn').addEventListener('click', async () => {
+  const ref = parseFloat(document.getElementById('directionRefInput').value);
+  if (!isFinite(ref) || ref === 0 || Math.abs(ref) > 100) {
+    alert('Enter a non-zero reference between -100 and +100 %.');
+    return;
+  }
+  directionTestActive = true;
+  document.getElementById('directionStatus').textContent = 'Testing...';
+  document.getElementById('directionResult').classList.remove('ok', 'bad');
+  setActiveUI(isActive);
+  await sendCommand('DIRECTION_TEST_START:' + ref);
+});
+document.getElementById('directionStopBtn').addEventListener('click', () => {
+  sendCommand('DIRECTION_TEST_STOP');
+  directionTestActive = false;
+});
+document.getElementById('applyMotorDirectionBtn')
+  .addEventListener('click', async () => {
+    if (!writer) {
+      alert('Connect to the controller first.');
+      return;
+    }
+
+    if (isActive || directionTestActive) {
+      alert('Stop the motor before changing direction.');
+      return;
+    }
+
+    const direction =
+      document.getElementById('motorDirectionSelect').value;
+
+    const status = document.getElementById('motorDirectionStatus');
+
+    try {
+      status.textContent = 'Waiting for firmware confirmation…';
+      await globalThis.motorBoard.send(motor, 'SET_MOTOR_DIRECTION:' + direction);
+    } catch (error) {
+      status.textContent = 'Failed to send direction command.';
+      log('Motor direction error: ' + error);
+    }
+  }
+);
+document.getElementById('flipEncoderBtn').addEventListener('click', async () => {
+  await sendCommand('FLIP_ENCODER_SIGN');
+  document.getElementById('directionStatus').textContent = 'Encoder sign flipped — test again';
+  document.getElementById('directionResult').classList.remove('ok', 'bad');
+  document.getElementById('confirmDirectionBtn').disabled = true;
+});
+document.getElementById('confirmDirectionBtn').addEventListener('click', async () => {
+  await sendCommand('CONFIRM_DIRECTION');
+});
+
+// ---------------- Tuning ----------------
+document.getElementById('m1ApplyCprBtn')
+  .addEventListener('click', async () => {
+
+    if (!writer) {
+      alert('Connect to the controller first.');
+      return;
+    }
+
+    if (isActive) {
+      alert('Stop the motor before changing CPR.');
+      return;
+    }
+
+    const raw = document.getElementById('m1CprInput').value.trim();
+    const cpr = Number(raw);
+
+    if (!raw || !Number.isFinite(cpr) || cpr <= 0) {
+      alert('Encoder CPR must be a positive number.');
+      return;
+    }
+
+    try {
+      await sendCommand('SET_CPR:' + cpr);
+      await sendCommand('SAVE_SENSOR_CONFIG');
+
+      document.getElementById('cprCalibrationStatus').textContent =
+        'CPR applied. Saving sensor configuration...';
+
+    } catch (error) {
+      document.getElementById('cprCalibrationStatus').textContent =
+        'Failed to apply CPR.';
+      log('CPR calibration error: ' + error);
+    }
+  }
+);
+
+document.getElementById('startCprCalibrationBtn')
+  .addEventListener('click', () => {
+
+    if (!writer) {
+      alert('Connect to the controller first.');
+      return;
+    }
+
+    if (isActive) {
+      alert('Stop the motor before calibration.');
+      return;
+    }
+
+    if (!Number.isFinite(lastEncoderCount)) {
+      alert('Waiting for encoder count. Check the connection.');
+      return;
+    }
+
+    cprCalibrationStartCount = lastEncoderCount;
+
+    document.getElementById('m1CprInput').value = 0;
+    document.getElementById('m1CprInput').readOnly = true;
+    document.getElementById('m1ApplyCprBtn').disabled = true;
+
+    document.getElementById('finishCprCalibrationBtn').disabled = false;
+    document.getElementById('cprCalibrationStatus').textContent =
+      'Measurement started. Rotate the shaft exactly one full revolution.';
+  });
+
+
+document.getElementById('finishCprCalibrationBtn')
+  .addEventListener('click', () => {
+
+    if (isActive) {
+      alert('Stop the motor before calibration.');
+      return;
+    }
+
+    if (cprCalibrationStartCount === null ||
+        !Number.isFinite(lastEncoderCount)) {
+      alert('Encoder measurement is not available.');
+      return;
+    }
+
+    const measuredCpr =
+      Math.abs((lastEncoderCount - cprCalibrationStartCount) | 0);
+
+    document.getElementById('m1CprInput').readOnly = false;
+    document.getElementById('m1ApplyCprBtn').disabled = false;
+
+    document.getElementById('finishCprCalibrationBtn').disabled = true;
+
+    if (measuredCpr <= 0) {
+      document.getElementById('cprCalibrationStatus').textContent =
+        'No encoder movement detected. Please repeat the measurement.';
+      cprCalibrationStartCount = null;
+      return;
+    }
+
+    document.getElementById('m1CprInput').value = measuredCpr;
+
+    document.getElementById('cprCalibrationStatus').textContent =
+      'Measured CPR: ' + measuredCpr +
+      '. Check the value, then press Enter in the measured CPR field to apply and save.';
+
+    cprCalibrationStartCount = null;
+  }
+);
+
+document.getElementById('m1ApplyTauDBtn').addEventListener('click', () => {
+  sendCommand('SET_TAUD:' + document.getElementById('m1TauDInput').value);
+});
+async function applyControllerDesignParameter(parameter) {
+  if (!writer) { alert('Connect to the controller first.'); return; }
+  const input = document.getElementById(parameter === 'zeta' ? 'm1ZetaInput' : 'm1OmegaInput');
+  const raw = input.value.trim();
+  const value = Number(raw);
+  const min = parameter === 'zeta' ? 0.3 : 1;
+  const max = parameter === 'zeta' ? 1.5 : 200;
+  if (!raw || !Number.isFinite(value) || value < min || value > max) {
+    alert(parameter === 'zeta' ? 'ζ must be between 0.3 and 1.5.' : 'ωₙ must be between 1 and 200 rad/s.');
+    return;
+  }
+  try {
+    await sendCommand(parameter === 'zeta' ? 'SET_ZETA:' + value : 'SET_OMEGA_N:' + value);
+    lastConfig = { ...(lastConfig || {}), [parameter === 'zeta' ? 'zeta' : 'omega']: value };
+  } catch (err) {
+    log('Controller design apply failed: ' + err);
+  }
+}
+document.getElementById('m1ApplyZetaBtn').addEventListener('click', () => applyControllerDesignParameter('zeta'));
+document.getElementById('m1ApplyOmegaBtn').addEventListener('click', () => applyControllerDesignParameter('omega'));
+document.getElementById('m1TuneBtn').addEventListener('click', async () => {
+  if (!writer) { alert('Connect to the controller first.'); return; }
+  try {
+    await sendCommand('TUNE');
+    directionTestActive = false;
+    identificationActive = true;
+    document.getElementById('m1TuneStatus').textContent = dual ? 'Identification running. It stops automatically on completion. Gains save when both motors are stopped.' : 'Identification running.';
+    document.getElementById('m1ConvergeBadge').textContent = 'not converged';
+  } catch (err) {
+    document.getElementById('m1TuneStatus').textContent = 'Tune failed';
+    log('Tune error: ' + err);
+  }
+});
+
+function bindEnterToApply(inputIds, buttonId) {
+  const button = document.getElementById(buttonId);
+  button.hidden = true;
+  inputIds.forEach(inputId => {
+    document.getElementById(inputId).title = 'Press Enter to apply';
+    document.getElementById(inputId).setAttribute('aria-description', 'Press Enter to apply this value');
+    document.getElementById(inputId).addEventListener('keydown', event => {
+      if (event.key === 'Enter' && !event.repeat && !event.isComposing) {
+        event.preventDefault();
+        if (!button.disabled) button.click();
+      }
+    });
+  });
+}
+bindEnterToApply(['m1CprInput'], 'm1ApplyCprBtn');
+bindEnterToApply(['m1TauDInput'], 'm1ApplyTauDBtn');
+bindEnterToApply(['m1ZetaInput'], 'm1ApplyZetaBtn');
+bindEnterToApply(['m1OmegaInput'], 'm1ApplyOmegaBtn');
+bindEnterToApply(['posKpInput'], 'setPosKpBtn');
+bindEnterToApply(['posMaxRpmInput'], 'setPosMaxRpmBtn');
+bindEnterToApply(['posMinRpmInput'], 'setPosMinRpmBtn');
+bindEnterToApply(['desiredInput'], 'setDesiredBtn');
+bindEnterToApply(['positionTuneTargetInput'], 'setPositionTuneTargetBtn');
+document.getElementById('applyMotorDirectionBtn').hidden = true;
+document.getElementById('motorDirectionButton').title = 'Click a direction to apply';
+document.getElementById('motorDirectionStatus').textContent = 'Click Normal or Reversed to apply.';
+
+// ---------------- Testing: stop ----------------
+document.getElementById('stopBtn').addEventListener('click', () => { sendCommand('STOP'); });
+
+// ---------------- Blackbox ----------------
+const LOG_CSV_COLUMNS = [
+  'record_type', 'event', 'run_id', 't_s', 'control_mode', 'firmware_state', 'running', 'active', 'fault_flags',
+  'encoder_count', 'velocity_reference_rpm', 'measured_velocity_rpm',
+  'target_position_deg', 'measured_position_deg', 'position_error_deg', 'position_velocity_reference_rpm', 'at_target',
+  'rls_a', 'rls_b', 'rls_tau_s', 'rls_motor_gain_K', 'velocity_kp', 'velocity_ki', 'velocity_kff',
+  'rls_samples', 'rls_converged', 'rls_valid',
+  'direction_test_reference_pct', 'direction_test_omega_rpm', 'encoder_sign', 'direction_match', 'direction_verified', 'direction_test_active',
+  'encoder_cpr', 'zeta', 'omega_n', 'tau_d_s', 'position_kp', 'position_max_rpm', 'position_min_rpm', 'motor_direction'
+];
+
+function updateLogUI() {
+  document.getElementById('logCount').textContent = logBuffer.length;
+  document.getElementById('logRunCount').textContent = new Set(logBuffer.map(row => row.run_id).filter(id => id !== undefined)).size;
+  document.getElementById('logDownloadBtn').disabled = logBuffer.length === 0;
+  document.getElementById('logClearBtn').disabled = recording;
+}
+
+function recordSample(fields) {
+  if (!recording || activeLogRunId === null) return;
+  logBuffer.push({ run_id: activeLogRunId, ...fields });
+  updateLogUI();
+}
+
+function logConfigSnapshot(config, recordType = 'CONFIG') {
+  if (!config) return;
+  recordSample({
+    record_type: recordType, event: recordType === 'RUN_START' ? 'settings_at_start' : '', t_s: lastTelemetryTime,
+    encoder_cpr: config.cpr, zeta: config.zeta, omega_n: config.omega, tau_d_s: config.taud,
+    velocity_kp: config.kp, velocity_ki: config.ki, velocity_kff: config.kff,
+    encoder_sign: config.encoderSign, direction_verified: config.directionVerified ? 1 : 0,
+    motor_direction: config.motorDirection, position_kp: config.posKp,
+    position_max_rpm: config.posMaxRpm, position_min_rpm: config.posMinRpm
+  });
+}
+
+function startLogRun(t) {
+  recording = true;
+  activeLogRunId = ++logRunCounter;
+  recordSample({ record_type: 'RUN_START', event: 'active', t_s: t, active: 1, fault_flags: 0 });
+  logConfigSnapshot(lastConfig, 'RUN_START');
+  document.getElementById('logStatus').textContent = `Recording run ${activeLogRunId} while active. Keep the UI connected.`;
+}
+
+function faultNames(bits) {
+  const names = [];
+  if (bits & 0x01) names.push('identify-timeout');
+  if (bits & 0x02) names.push('bad-gains-rejected');
+  const known = 0x03;
+  if (bits & ~known) names.push(`other-0x${(bits & ~known).toString(16)}`);
+  return names;
+}
+
+function finishLogRun(reason, faultBits) {
+  if (!recording) return;
+  const completedRun = activeLogRunId;
+  recordSample({
+    record_type: 'RUN_END', event: reason, t_s: lastTelemetryTime,
+    active: 0, fault_flags: faultBits === null ? '' : faultBits
+  });
+  recording = false;
+  activeLogRunId = null;
+  const faults = faultBits ? faultNames(faultBits) : [];
+  document.getElementById('logStatus').textContent = faults.length
+    ? `Run ${completedRun} ended with fault flags ${faultBits} (${faults.join(', ')}). Captured data is ready to download.`
+    : (reason === 'USB connection lost'
+      ? `Run ${completedRun} interrupted by USB disconnect. Captured data remains available in this page.`
+      : `Run ${completedRun} complete (${reason}). Captured data is ready to download.`);
+  updateLogUI();
+}
+
+document.getElementById('logClearBtn').addEventListener('click', () => {
+  if (recording) return;
+  logBuffer = [];
+  logRunChart.clear();
+  document.getElementById('logStatus').textContent = 'Waiting for the next active run. Logging starts automatically.';
+  updateLogUI();
+});
+document.getElementById('logDownloadBtn').addEventListener('click', () => {
+  if (!logBuffer.length) return;
+  const csvEscape = value => {
+    if (value === null || value === undefined) return '';
+    const text = String(value);
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+  let csv = LOG_CSV_COLUMNS.join(',') + '\n';
+  logBuffer.forEach(row => { csv += LOG_CSV_COLUMNS.map(column => csvEscape(row[column])).join(',') + '\n'; });
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  a.href = url;
+  a.download = 'motor_' + panelMotor + '_log_' + Date.now() + '.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+updateLogUI();
+
+// ---------------- Backup / Restore ----------------
+document.getElementById('exportConfigBtn').addEventListener('click', async () => {
+  await sendCommand('GET_CONFIG');
+  setTimeout(() => {
+    if (!lastConfig) { alert('No CONFIG: reply received yet — check the connection.'); return; }
+    const blob = new Blob([JSON.stringify(lastConfig, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'motor_' + panelMotor + '_config_' + Date.now() + '.json';
+    a.click();
+  }, 400);
+});
+document.getElementById('importConfigBtn').addEventListener('click', async () => {
+  const fileInput = document.getElementById('importConfigFile');
+  const status = document.getElementById('configRestoreStatus');
+  if (!writer) { status.textContent = 'Connect and stop the controller before restoring.'; status.style.color = '#9f271d'; return; }
+  if (isActive || directionTestActive || identificationActive) { status.textContent = 'Stop the test and stop the controller before restoring.'; status.style.color = '#9f271d'; return; }
+  if (!fileInput.files.length) { alert('Choose a config .json file first'); return; }
+  try {
+    const cfg = JSON.parse(await fileInput.files[0].text());
+    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) throw new Error('The selected file is not a motor configuration backup.');
+    const supported = [
+      ['encoder CPR', cfg.cpr], ['ζ', cfg.zeta], ['ωₙ', cfg.omega], ['τd', cfg.taud],
+      ['position Kp', cfg.posKp], ['maximum position velocity', cfg.posMaxRpm],
+      ['minimum position velocity', cfg.posMinRpm ?? cfg.positionMinRpm], ['motor direction', cfg.motorDirection]
+    ].filter(([, value]) => value !== undefined);
+    if (!supported.length) throw new Error('This file contains no settings supported by this firmware.');
+    if (supported.some(([, value]) => !Number.isFinite(Number(value)))) throw new Error('The backup contains a non-numeric setting.');
+    const confirmation = [
+      `Restore ${fileInput.files[0].name} to the connected controller?`,
+      '',
+      'Supported settings will be applied for this session only; they will not be saved to flash.',
+      'Encoder sign, direction confirmation, and identified velocity gains are not restored.',
+      'The controller must be stopped.'
+    ].join('\n');
+    if (!confirm(confirmation)) return;
+
+    status.textContent = 'Applying backup settings…';
+    status.style.color = '#364038';
+    if (cfg.cpr !== undefined) await sendCommand('SET_CPR:' + Number(cfg.cpr));
+    if (cfg.zeta !== undefined && cfg.omega !== undefined) await sendCommand('SET_GAIN_PARAMS:' + Number(cfg.zeta) + ',' + Number(cfg.omega));
+    else {
+      if (cfg.zeta !== undefined) await sendCommand('SET_ZETA:' + Number(cfg.zeta));
+      if (cfg.omega !== undefined) await sendCommand('SET_OMEGA_N:' + Number(cfg.omega));
+    }
+    if (cfg.taud !== undefined) await sendCommand('SET_TAUD:' + Number(cfg.taud));
+    if (cfg.posKp !== undefined) await sendCommand('SET_POS_KP:' + Number(cfg.posKp));
+    if (cfg.posMaxRpm !== undefined) await sendCommand('SET_POS_MAX_RPM:' + Number(cfg.posMaxRpm));
+    const positionMinRpm = cfg.posMinRpm ?? cfg.positionMinRpm;
+    if (positionMinRpm !== undefined) await sendCommand('SET_POS_MIN_RPM:' + Number(positionMinRpm));
+    if (cfg.motorDirection !== undefined) await sendCommand('SET_MOTOR_DIRECTION_RUNTIME:' + (Number(cfg.motorDirection) < 0 ? '-1' : '1'));
+    status.textContent = 'Backup settings sent to the controller for this session. They are not saved to flash; use the Sensor/Tuning Save buttons to keep them.';
+    status.style.color = '#245b32';
+    log('Backup settings applied for this session only. Encoder sign and direction must still be verified; run Auto Tune to generate velocity gains if needed.');
+  } catch (err) {
+    status.textContent = 'Restore failed: ' + err.message;
+    status.style.color = '#9f271d';
+    log('Restore failed: ' + err);
+  }
+});
+
+// ---------------- CLI ----------------
+function cliEcho(text, cls) {
+  const el = document.getElementById('cliOutput');
+  const span = document.createElement('div');
+  span.className = cls;
+  span.textContent = (cls === 'tx' ? '> ' : '< ') + text;
+  el.appendChild(span);
+  while (el.childElementCount > CLI_MAX_LINES) el.removeChild(el.firstChild);
+  el.scrollTop = el.scrollHeight;
+}
+document.getElementById('cliSendBtn').addEventListener('click', sendCliCommand);
+document.getElementById('cliInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { sendCliCommand(); }
+  else if (e.key === 'ArrowUp') {
+    if (cliHistory.length && cliHistoryIdx > 0) { cliHistoryIdx--; e.target.value = cliHistory[cliHistoryIdx]; }
+    e.preventDefault();
+  } else if (e.key === 'ArrowDown') {
+    if (cliHistoryIdx < cliHistory.length - 1) { cliHistoryIdx++; e.target.value = cliHistory[cliHistoryIdx]; }
+    else { cliHistoryIdx = cliHistory.length; e.target.value = ''; }
+    e.preventDefault();
+  }
+});
+function sendCliCommand() {
+  const input = document.getElementById('cliInput');
+  const cmd = input.value.trim();
+  if (!cmd) return;
+  cliHistory.push(cmd);
+  cliHistoryIdx = cliHistory.length;
+  sendCommand(cmd);
+  input.value = '';
+}
+
+// The shared Restore/Save buttons act on the active settings page only.
+let tabConfigRequestPending = null;
+let tabConfigStatusSection = null;
+function setConfigActionStatus(message, isError = false, section = null) {
+  const targetSection = section || tabConfigStatusSection || activeConfigSection();
+  document.querySelectorAll('.config-action-status').forEach(status => {
+    if (targetSection && status.dataset.section !== targetSection) return;
+    status.textContent = message;
+    status.style.color = isError ? '#9f271d' : '#333';
+  });
+}
+function activeConfigSection() {
+  const activePage = document.querySelector('.page.active');
+  return activePage && (activePage.id === 'page-sensors' || activePage.id === 'page-tuning')
+    ? activePage.id.substring(5) : null;
+}
+document.querySelectorAll('.restore-tab-config-btn').forEach(button => {
+  button.addEventListener('click', () => {
+    const section = button.dataset.section;
+    tabConfigStatusSection = section;
+    if (!writer) { setConfigActionStatus('Connect to the controller first.', true, section); return; }
+    tabConfigRequestPending = 'restore-' + section;
+    setConfigActionStatus('Restoring saved ' + section + ' settings from flash...');
+    sendCommand(section === 'sensors' ? 'RESTORE_SENSOR_CONFIG' : 'RESTORE_TUNING_CONFIG');
+  });
+});
+document.querySelectorAll('.save-tab-config-btn').forEach(button => {
+  button.addEventListener('click', () => {
+    const section = button.dataset.section;
+    tabConfigStatusSection = section;
+    if (!writer) { setConfigActionStatus('Connect to the controller first.', true, section); return; }
+    tabConfigRequestPending = 'save-' + section;
+    setConfigActionStatus('Saving ' + section + ' settings to flash...');
+    sendCommand(section === 'sensors' ? 'SAVE_SENSOR_CONFIG' : 'SAVE_TUNING_CONFIG');
+  });
+});
+
+// ---------------- DFU (bootloader jump + WebUSB flash) ----------------
+document.getElementById('bootloaderBtn').addEventListener('click', async () => {
+  if (!writer) { alert('Connect first, then click this.'); return; }
+  if (!confirm('Enter DFU mode for the whole board? Both motors will stop.')) return;
+  await sendCommand('BOOTLOADER');
+  await cleanupConnection();
+  document.getElementById('flashStatus').textContent = 'Board resetting into DFU... wait 2s, then Flash Firmware. If the log above never showed "OK:BOOTLOADER", the command did not reach the board.';
+});
+function getDfuSeFlashMemory(settings) {
+  if (settings.alternate.interfaceProtocol !== 0x02 || typeof settings.name !== 'string') return null;
+  try {
+    const memory = dfuse.parseMemoryDescriptor(settings.name.trim());
+    const flashBase = 0x08000000;
+    const flashSegment = memory.segments.find(segment =>
+      segment.start <= flashBase && flashBase < segment.end && segment.erasable && segment.writable);
+    return flashSegment ? memory : null;
+  } catch (err) {
+    return null;
+  }
+}
+function getStm32F4FirstBankFlashInterface(interfaces) {
+  const protocol2Interfaces = interfaces.filter(intf => intf.alternate.interfaceProtocol === 0x02);
+  const unnamedInternalFlash = protocol2Interfaces.find(intf =>
+    intf.alternate.alternateSetting === 0 &&
+    (typeof intf.name !== 'string' || !intf.name.trim()));
+  if (!unnamedInternalFlash) return null;
+
+  const names = protocol2Interfaces
+    .map(intf => typeof intf.name === 'string' ? intf.name.trim() : '')
+    .filter(Boolean);
+  const hasOptionBytes = names.some(name => /^@Option Bytes\s*\/0x1fffc000\b/i.test(name));
+  const hasOtpMemory = names.some(name => /^@OTP Memory\s*\/0x1fff7800\b/i.test(name));
+  const hasDeviceFeature = names.some(name => /^@Device Feature\s*\/0xffff0000\b/i.test(name));
+  if (!hasOptionBytes || !hasOtpMemory || !hasDeviceFeature) return null;
+
+  /* The F407 1 MB layout is the same as the first bank of 2 MB F42/F43 parts. */
+  unnamedInternalFlash.name = '@Internal Flash /0x08000000/04*016Kg,01*064Kg,07*128Kg';
+  return getDfuSeFlashMemory(unnamedInternalFlash) ? unnamedInternalFlash : null;
+}
+document.getElementById('flashBtn').addEventListener('click', async () => {
+  if (typeof dfu === 'undefined' || typeof dfuse === 'undefined') { document.getElementById('flashStatus').textContent = 'Add your original dfu.js and dfuse.js files beside index.html to enable flashing.'; return; }
+  const fileInput = document.getElementById('firmwareFile');
+  if (!fileInput.files.length) { alert('Choose a .bin file first'); return; }
+  const statusEl = document.getElementById('flashStatus');
+  statusEl.classList.remove('success', 'error');
+  let activeDfuDevice = null;
+  try {
+    statusEl.textContent = 'Requesting USB device...';
+    const selectedDevice = await navigator.usb.requestDevice({ filters: [] });
+    let interfaces = dfu.findDeviceDfuInterfaces(selectedDevice);
+    if (interfaces.length === 0) throw new Error('No DFU interface found. Pick the STM32 BOOTLOADER device.');
+    if (!interfaces.some(getDfuSeFlashMemory)) {
+      const nameReader = new dfu.Device(selectedDevice, interfaces[0]);
+      let mapping = null;
+      try {
+        await nameReader.device_.open();
+        const configValue = interfaces[0].configuration.configurationValue;
+        if (nameReader.device_.configuration === null ||
+            nameReader.device_.configuration.configurationValue !== configValue) {
+          await nameReader.device_.selectConfiguration(configValue);
+        }
+        mapping = await nameReader.readInterfaceNames();
+      } catch (err) {
+        log('[DFU] Could not resolve alternate interface names: ' + err);
+      } finally {
+        await nameReader.close();
+      }
+
+      if (mapping) {
+        for (const intf of interfaces) {
+          if (intf.alternate.interfaceProtocol !== 0x02) continue;
+          const configValue = intf.configuration.configurationValue;
+          const interfaceNumber = intf['interface'].interfaceNumber;
+          const alternateSetting = intf.alternate.alternateSetting;
+          const resolvedName = mapping[configValue]?.[interfaceNumber]?.[alternateSetting];
+          if (typeof resolvedName === 'string' && resolvedName.trim()) intf.name = resolvedName;
+        }
+      }
+    }
+    let memoryMapInterface = interfaces.find(getDfuSeFlashMemory);
+    let usedStm32F4FallbackMap = false;
+    if (!memoryMapInterface) {
+      memoryMapInterface = getStm32F4FirstBankFlashInterface(interfaces);
+      usedStm32F4FallbackMap = Boolean(memoryMapInterface);
+    }
+    const selectedInterface = memoryMapInterface || interfaces[0];
+    let device = new dfu.Device(selectedDevice, selectedInterface);
+    activeDfuDevice = device;
+    await device.open();
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const configurationIndex = selectedDevice.configurations.findIndex(configuration =>
+      configuration.configurationValue === selectedInterface.configuration.configurationValue);
+    if (configurationIndex < 0) throw new Error('Could not read the selected DFU configuration.');
+    const configDesc = dfu.parseConfigurationDescriptor(await device.readConfigurationDescriptor(configurationIndex));
+    let funcDesc = null;
+    for (let d of configDesc.descriptors) {
+      if (d.bDescriptorType === 0x21 && d.hasOwnProperty('bcdDFUVersion')) { funcDesc = d; break; }
+    }
+    let transferSize = 1024, manifestationTolerant = true, dfuVersion = 0x0100;
+    if (funcDesc) {
+      transferSize = funcDesc.wTransferSize;
+      manifestationTolerant = (funcDesc.bmAttributes & 0x04) !== 0;
+      dfuVersion = funcDesc.bcdDFUVersion;
+    }
+    if (dfuVersion === 0x011a && device.settings.alternate.interfaceProtocol === 0x02) {
+      if (!memoryMapInterface) {
+        const interfaceSummary = interfaces
+          .filter(intf => intf.alternate.interfaceProtocol === 0x02)
+          .map(intf => `alt ${intf.alternate.alternateSetting}: ${intf.name || '(unnamed)'}`)
+          .join('; ');
+        throw new Error('The STM32 DfuSe interface did not provide a usable writable flash map for 0x08000000. ' +
+          'DFU interfaces found: ' + (interfaceSummary || 'none') +
+          '. Re-enter DFU mode and reconnect. No flash operation was started.');
+      }
+      device = new dfuse.Device(device.device_, device.settings);
+      activeDfuDevice = device;
+      log(usedStm32F4FallbackMap
+        ? '[DFU] Internal Flash map was not advertised; using the verified STM32F4 first 1 MB layout.'
+        : '[DFU] Using flash map: ' + device.memoryInfo.name);
+    }
+    device.logProgress = (done, total) => {
+      if (total) {
+        const pct = Math.round((done / total) * 100);
+        document.getElementById('flashProgress').value = pct;
+        statusEl.textContent = `Flashing... ${pct}%`;
+      }
+    };
+    device.logInfo = (msg) => log('[DFU] ' + msg);
+    device.logDebug = () => {};
+    device.logWarning = (msg) => log('[DFU warning] ' + msg);
+    const firmwareData = await fileInput.files[0].arrayBuffer();
+    if (usedStm32F4FallbackMap && firmwareData.byteLength > 0x100000) {
+      throw new Error('This STM32F4 fallback map covers the first 1 MB only. The selected .bin is too large; no flash operation was started.');
+    }
+    statusEl.textContent = 'Flashing...';
+    let attempts = 0, lastError = null;
+    while (attempts < 3) {
+      try { await device.do_download(transferSize, firmwareData, manifestationTolerant); lastError = null; break; }
+      catch (err) { lastError = err; attempts++; log(`Attempt ${attempts} failed: ${err}`); await new Promise(r => setTimeout(r, 800)); }
+    }
+    if (lastError) throw lastError;
+    statusEl.classList.add('success');
+    statusEl.textContent = 'Done! Board rebooting.';
+    directionVerified = false;
+    updateDirectionUI();
+  } catch (err) {
+    statusEl.classList.add('error');
+    statusEl.textContent = 'Failed: ' + err;
+    log('Flash error: ' + err);
+  } finally {
+    if (activeDfuDevice) await activeDfuDevice.close();
+  }
+});
+
+// ---------------- Reusable rolling chart (auto-fit + wheel zoom) ----------------
+function makeChart(canvasId, opts = {}) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+
+  const WINDOW = opts.window || 5;
+  const MIN_SPAN = opts.minSpan || 10;     // never auto-fit tighter than this
+  const showRef = opts.showRef !== false;
+
+  let points = [];
+  let manual = null;                       // {min,max} once the user has zoomed; null = auto-fit
+  let view = { min: -100, max: 100 };
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  function add(t, ref, actual) {
+    if (!isFinite(t) || !isFinite(actual)) return;
+    if (showRef && !isFinite(ref)) return;
+    points.push({ t, ref, actual });
+    const cutoff = t - WINDOW;
+    while (points.length > 0 && points[0].t < cutoff) points.shift();
+    draw();
+  }
+
+  function clear() { points = []; draw(); }
+  function autoFit() { manual = null; draw(); }
+
+  function autoRange() {
+    if (!points.length) return { min: -MIN_SPAN, max: MIN_SPAN };
+    let lo = Infinity, hi = -Infinity;
+    for (const p of points) {
+      if (showRef) { lo = Math.min(lo, p.ref); hi = Math.max(hi, p.ref); }
+      lo = Math.min(lo, p.actual); hi = Math.max(hi, p.actual);
+    }
+    if (hi - lo < MIN_SPAN) {
+      const mid = (hi + lo) / 2;
+      lo = mid - MIN_SPAN / 2;
+      hi = mid + MIN_SPAN / 2;
+    }
+    const pad = (hi - lo) * 0.1;
+    return { min: lo - pad, max: hi + pad };
+  }
+
+  // Mouse wheel = zoom the Y axis around the cursor; double-click = auto-fit
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const frac = (e.clientY - rect.top) / rect.height;
+    const c = view.max - frac * (view.max - view.min);
+    const f = e.deltaY < 0 ? 0.8 : 1.25;
+    const nmin = c - (c - view.min) * f;
+    const nmax = c + (view.max - c) * f;
+    if (nmax - nmin < 0.5) return;
+    manual = { min: nmin, max: nmax };
+    draw();
+  }, { passive: false });
+  canvas.addEventListener('dblclick', autoFit);
+
+  function draw() {
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+    if (w <= 0 || h <= 0) return;
+
+    ctx.clearRect(0, 0, w, h);
+
+    const left = 2, right = 2, top = 4, bottom = 2;
+    const plotW = Math.max(1, w - left - right);
+    const plotH = Math.max(1, h - top - bottom);
+
+    let tMin = 0, tMax = WINDOW;
+    if (points.length > 0) {
+      tMax = Math.max(points[points.length - 1].t, WINDOW);
+      tMin = tMax - WINDOW;
+    }
+
+    view = manual || autoRange();
+    const yMin = view.min, yMax = view.max;
+
+    if (opts.onView) opts.onView(yMin, yMax, tMin, tMax);
+
+    const X = t => left + ((t - tMin) / (tMax - tMin)) * plotW;
+    const Y = v => {
+      const value = Math.max(yMin, Math.min(yMax, v));
+      return top + (1 - (value - yMin) / (yMax - yMin)) * plotH;
+    };
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+      const y = Y(yMin + (i / 4) * (yMax - yMin));
+      ctx.beginPath();
+      ctx.moveTo(left, y);
+      ctx.lineTo(left + plotW, y);
+      ctx.strokeStyle = '#edf0f2';
+      ctx.stroke();
+    }
+    if (yMin < 0 && yMax > 0) {
+      ctx.beginPath();
+      ctx.moveTo(left, Y(0));
+      ctx.lineTo(left + plotW, Y(0));
+      ctx.strokeStyle = '#c7cdd3';
+      ctx.stroke();
+    }
+    for (let i = 0; i <= 5; i++) {
+      const x = left + (i / 5) * plotW;
+      ctx.beginPath();
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, top + plotH);
+      ctx.strokeStyle = '#f1f3f5';
+      ctx.stroke();
+    }
+
+    function drawLine(key, color) {
+      if (points.length < 2) return;
+      ctx.beginPath();
+      points.forEach((p, i) => {
+        const x = X(p.t), y = Y(p[key]);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+    if (showRef) drawLine('ref', '#1f77b4');
+    drawLine('actual', '#ff7f0e');
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+
+  return { add, clear, resize, autoFit };
+}
+
+// Builds a chart card (legend, Y/X axis labels, canvas) inside `hostId` and returns the chart.
+function createChartCard(hostId, key, cfg) {
+  const xLabels = [0, 1, 2, 3, 4, 5].map(i => `<span id="${key}X${i}">0.0</span>`).join('');
+  document.getElementById(hostId).innerHTML = `
+    <div class="chart-shell">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">${cfg.title}</div>
+          <div class="chart-subtitle">${cfg.subtitle} · scroll to zoom, double-click to auto-fit</div>
+        </div>
+        <div class="chart-legend">
+          ${cfg.showRef === false ? '' : `<span class="legend-item"><span class="legend-line ref"></span>${cfg.refLabel}</span>`}
+          <span class="legend-item"><span class="legend-line actual"></span>Measured</span>
+        </div>
+      </div>
+      <div class="chart-area">
+        <div class="chart-y-axis"><span class="y-top" id="${key}YTop"></span><span class="y-mid" id="${key}YMid"></span><span class="y-bottom" id="${key}YBottom"></span></div>
+        <div class="chart-plot"><canvas id="${key}Canvas"></canvas><div class="chart-x-axis">${xLabels}</div></div>
+      </div>
+      <div class="chart-unit">Time (s) · ${cfg.unit}</div>
+    </div>`;
+  const fmt = v => Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1);
+  return makeChart(key + 'Canvas', {
+    minSpan: cfg.minSpan,
+    showRef: cfg.showRef,
+    onView: (yMin, yMax, tMin, tMax) => {
+      document.getElementById(key + 'YTop').textContent = fmt(yMax);
+      document.getElementById(key + 'YMid').textContent = fmt((yMin + yMax) / 2);
+      document.getElementById(key + 'YBottom').textContent = fmt(yMin);
+      for (let i = 0; i <= 5; i++) {
+        document.getElementById(key + 'X' + i).textContent = (tMin + (i / 5) * (tMax - tMin)).toFixed(1);
+      }
+    }
+  });
+}
+
+const currentChart = createChartCard('currentChartHost', 'current', { title: 'Current Response', subtitle: 'Estimated shunt current', showRef: false, unit: 'A', minSpan: 0.2 });
+const velChart = createChartCard('velChartHost', 'vel', { title: 'Velocity Response', subtitle: 'Reference vs measured velocity', refLabel: 'Reference', unit: 'RPM', minSpan: 20 });
+const posChart = createChartCard('posChartHost', 'pos', { title: 'Position Response', subtitle: 'Target vs measured angle', refLabel: 'Target', unit: 'deg', minSpan: 10 });
+const posTuneChart = createChartCard('posTuneChartHost', 'postune', { title: 'Position Tuning Response', subtitle: 'Adjust Position Kp and compare target vs measured angle', refLabel: 'Target', unit: 'deg', minSpan: 10 });
+const logRunChart    = makeChart('logRunChart');
+const sensorEncChart = makeChart('sensorEncChart', { showRef: false, minSpan: 50 });
+
+const panelMotor = motor;
+const panelDual = dual;
+const panelAPI = {
+  receive: handleLine,
+  connected(value) {
+    writer = value ? {} : null;
+    if (!value) {
+      if (recording) finishLogRun('USB connection lost', null);
+      identificationActive = false;
+      directionTestActive = false;
+      setActiveUI(false);
+    } else {
+      velChart.clear(); posChart.clear(); logRunChart.clear(); sensorEncChart.clear();
+    }
+    setConnected(value);
+  }
+};
+
+document.getElementById('homeBoard').textContent = dual ? 'Dual Motor' : 'Single Motor';
+if (dual) {
+  const saveNote = 'Targets and tests start directly. Flash saving waits until both motors are stopped. Wait for save confirmation before removing power.';
+  document.getElementById('setupOperationNote').textContent = '' + saveNote;
+  for (const page of ['tuning', 'sensors']) {
+    const note = document.createElement('p');
+    note.className = 'warn-note';
+    note.textContent = saveNote;
+    document.getElementById('page-' + page).appendChild(note);
+  }
+}
+if (!dual) document.querySelectorAll('#page-can button, #page-can input, #page-can select').forEach(e => e.disabled = true);
+document.getElementById('canConfigStatus').textContent = dual ? 'Connect to read the board settings.' : 'CAN setup requires dual-motor CAN firmware.';
+panelAPI.navigate = page => goToPage(page);
+panelAPI.stop = () => sendCommand('STOP');
+panelAPI.snapshot = () => ({active:isActive, connected:!!writer, velocity:latestVelocity, position:latestPosition.measured, fault:document.getElementById('sideFault').textContent});
+panelAPI.destroy = () => { timers.forEach(id => { globalThis.clearInterval(id); globalThis.clearTimeout(id); }); listeners.forEach(args=>globalThis.removeEventListener(...args)); };
+panelAPI.connected(false);
+return panelAPI;
+
+}
+
+'use strict';
+let mode = 'single', port = null, writer = null, reader = null, reading = null;
+let busy = false, closing = false, verified = false, writes = Promise.resolve();
+const $ = id => document.getElementById(id);
+let motorPanels = [];
+const panels = () => motorPanels;
+function message(text) { $('message').textContent = text || ''; $('message').parentElement.hidden = !text; }
+function state() {
+  $('status').textContent = verified ? 'Connected • ' + (mode === 'dual' ? 'Dual motor board' : 'Single motor board') : port ? 'Checking firmware…' : 'Disconnected';
+  $('connect').textContent = port ? 'Disconnect USB' : 'Connect USB';
+  $('connect').disabled = busy;
+  $('connect').classList.toggle('connected', verified);
+  $('stop').disabled = !verified;
+  $('connectionDot').classList.toggle('online', verified);
+  refreshHeaders();
+}
+function updateBoardCards() {
+  $('chooseSingle').setAttribute('aria-pressed', String(mode === 'single'));
+  $('chooseDual').setAttribute('aria-pressed', String(mode === 'dual'));
+}
+function select(next) {
+  if (busy || closing) return;
+  if (next === mode && motorPanels.length) return;
+  if (port) {
+    if (confirm('Disconnect and stop the current board before switching?')) void disconnect().then(() => select(next));
+    return;
+  }
+  mode = next;
+  $('single').setAttribute('aria-pressed', String(mode === 'single'));
+  $('dual').setAttribute('aria-pressed', String(mode === 'dual'));
+  $('panels').classList.toggle('dual', mode === 'dual');
+  $('panels').replaceChildren();
+  motorPanels.forEach(p => p.destroy()); motorPanels = [];
+  for (let motor = 1; motor <= (mode === 'dual' ? 2 : 1); motor++) {
+    const section = document.createElement('section'); section.className = 'motor-card'; section.dataset.motor = motor;
+    section.innerHTML = `<header class="motor-heading"><h2>Motor ${motor}</h2></header><div class="motor-readout"><div><span>VELOCITY</span><strong id="rpm-${motor}">—</strong><small>RPM</small></div><div><span>POSITION</span><strong id="pos-${motor}">—</strong><small>deg</small></div><div class="motor-actions"><button id="stop-${motor}" class="subtle" disabled>Stop</button></div></div><div class="fault-readout" id="fault-${motor}" hidden></div><div class="motor-content"></div>`;
+    $('panels').append(section);
+    const root = section.querySelector('.motor-content').attachShadow({mode:'open'});
+    root.innerHTML = $('panelTemplate').innerHTML;
+    const api = createMotorPanel(root,motor,mode === 'dual');
+    motorPanels.push(api);
+    $('stop-'+motor).onclick = () => api.stop();
+  }
+  navigate(currentPage);
+  refreshHeaders();
+
+  message('');
+  updateBoardCards();
+}
+function write(command) {
+  const activeWriter = writer;
+  const job = writes.then(async () => {
+    if (!activeWriter || activeWriter !== writer) throw new Error('USB is disconnected');
+    await activeWriter.write(new TextEncoder().encode(command + '\r\n'));
+  });
+  writes = job.catch(() => {});
+  return job;
+}
+async function send(motor, command) {
+  if (!verified || closing) throw new Error('Connect a matching board first');
+  if (![1, 2].includes(motor) || (mode === 'single' && motor !== 1)) throw new Error('Invalid motor');
+  command = command.trim();
+  if (mode === 'single' && /^(?:M[12]:)?(?:GET_AXIS_CAN|SET_AXIS_CAN)/.test(command)) throw new Error('CAN configuration is not supported by this firmware');
+  if (!command || /[\r\n]/.test(command)) throw new Error('Send one command at a time');
+  const explicit = command.match(/^M([12]):(.*)$/);
+  if (explicit) {
+    if (Number(explicit[1]) !== motor) throw new Error('Use the other motor panel for this command');
+    command = explicit[2];
+  }
+  if (command === 'BOOTLOADER') {
+    await write(mode === 'dual' ? 'STOP_ALL' : 'STOP');
+    await write('BOOTLOADER');
+    await disconnect(); return;
+  }
+  if (command === 'STOP_ALL') return write(mode === 'dual' ? command : 'STOP');
+  return write(mode === 'dual' ? `M${motor}:${command}` : command);
+}
+async function initialize() {
+  if (mode === 'dual') await send(1, 'GET_AXIS_CAN');
+  for (let motor = 1; motor <= (mode === 'dual' ? 2 : 1); motor++) {
+    for (const command of ['GET_CPR', 'GET_CONFIG', 'GET_POSITION']) await send(motor, command);
+  }
+}
+function route(line) {
+
+  const match = line.match(/^M([12]):(.*)$/);
+  const motor = match ? Number(match[1]) : 1;
+  const payload = match ? match[2] : line;
+  if (payload.startsWith('VERSION:')) {
+    const board = payload.split(',')[1]?.trim() || '';
+    const isDualBoard = /DUAL/i.test(board);
+    if ((mode === 'dual' && !isDualBoard) || (mode === 'single' && isDualBoard)) {
+      console.warn('Board mismatch, firmware reported:', JSON.stringify(board));
+      message(`Firmware reports ${board || 'an unknown board'}. Select the matching board type before controlling motors.`);
+      void disconnect(); return;
+    }
+    $('shellVersion').textContent = payload.substring(8).split(',')[0].trim() || '-';
+    if (!verified) {
+      verified = true; panels().forEach(p => p?.connected(true)); state();
+      message('');
+      void initialize().catch(e => message(e.message));
+    }
+    panels().forEach(p => p?.receive(payload)); return;
+  }
+  if (!verified) return;
+  panels()[motor - 1]?.receive(payload);
+  refreshHeaders();
+}
+async function read(activePort) {
+  const decoder = new TextDecoder(); let buffer = '';
+  reader = activePort.readable.getReader();
+  try {
+    while (true) {
+      const {value, done} = await reader.read(); if (done) break;
+      buffer += decoder.decode(value, {stream:true});
+      const lines = buffer.split('\n'); buffer = lines.pop();
+      if (buffer.length > 8192) throw new Error('Oversized USB response');
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try { route(line.trim()); }
+        catch (e) { console.error('Handler error on line:', line, e); }
+      }
+    }
+  } catch (e) { if (!closing) message('USB read failed: ' + e.message); }
+  finally { reader.releaseLock(); reader = null; if (!closing) setTimeout(() => void disconnect(), 0); }
+}
+async function disconnect() {
+  if (closing) return;
+  closing = true;
+  const activePort = port;
+  try {
+    if (verified && writer) await write(mode === 'dual' ? 'STOP_ALL' : 'STOP').catch(() => {});
+    verified = false; panels().forEach(p => p?.connected(false));
+    if (reader) await reader.cancel().catch(() => {});
+    if (reading) await reading;
+    await writes;
+    if (writer) { writer.releaseLock(); writer = null; }
+    if (activePort) await activePort.close().catch(() => {});
+  }
+   finally { port = null; reading = null; closing = false; busy = false; state(); 
+
+   }
+     console.warn('disconnect() called from:', new Error().stack);
+}
+async function toggle() {
+  if (busy || closing) return;
+  if (port) return disconnect();
+  if (!navigator.serial) { message('Web Serial requires Chrome or Edge on localhost or HTTPS.'); return; }
+  if (panels().length !== (mode === 'dual' ? 2 : 1) || panels().some(p => !p)) { message('Wait for the motor panels to finish loading.'); return; }
+  busy = true; state();
+  try {
+    port = await navigator.serial.requestPort(); await port.open({baudRate:115200});
+    writer = port.writable.getWriter(); reading = read(port); await write('GET_VERSION');
+    const activePort = port;
+    setTimeout(() => { if (port === activePort && !verified) { message('No compatible firmware response. Check the USB firmware and selected board.'); void disconnect(); } }, 4000);
+  } catch (e) { message('Connection failed: ' + e.message); await disconnect(); }
+  finally { busy = false; state(); }
+}
+window.motorBoard = {select, send, toggle, disconnect, navigate(page) { navigate(page); }, ready() { state(); }};
+$('connect').onclick = toggle;
+$('stop').onclick = () => send(1, 'STOP_ALL').catch(e => message(e.message));
+if (navigator.serial) navigator.serial.addEventListener('disconnect', e => { if (e.target === port || e.port === port) void disconnect(); });
+window.addEventListener('beforeunload', e => { if (port) { e.preventDefault(); e.returnValue = ''; } });
+
+let currentPage = 'home';
+const pageDetails = {
+ home:['Home',''],
+ testing:['Motor controls','Set a reference and monitor the response of each motor.'],
+ motorsetup:['Motor setup','Check motor direction and encoder polarity before tuning.'],
+ tuning:['Controller tuning','Identify each motor and tune its velocity and position controllers.'],
+ sensors:['Encoder & sensors','Configure counts per revolution and inspect encoder feedback.'],
+ blackbox:['Motor logs','Review recorded runs and export each motor’s measurements.'],
+ backup:['Backup & restore','Export or restore settings for each motor independently.'],
+ cli:['Motor console','Send commands and inspect responses for the selected motor column.'],
+ boards:['Choose your board','One workspace, configured for one or two motors.'],
+ firmware:['Firmware update','Update the firmware for the entire connected board.'],
+ can:['CAN','Configure the CAN1 bus for both motors.']
+};
+function navigate(page) {
+  if (!pageDetails[page]) return;
+  currentPage=page;
+  $('pageTitle').textContent=pageDetails[page][0]; $('crumb').textContent=pageDetails[page][0];
+  $('pageSubtitle').textContent=pageDetails[page][1];
+  $('eyebrow').textContent=['boards','firmware','can'].includes(page)?'BOARD SETTINGS': mode==='dual'?'DUAL MOTOR WORKSPACE':'SINGLE MOTOR WORKSPACE';
+  $('pageTitleBar').hidden = page === 'home';
+  document.querySelectorAll('.nav button').forEach(b=>{b.classList.toggle('active',b.dataset.page===page);b.setAttribute('aria-current',b.dataset.page===page?'page':'false')});
+  const dualHome = mode==='dual' && page==='home';
+  $('boardSelection').hidden=page!=='boards'; $('dualHome').hidden=!dualHome; $('panels').hidden=page==='boards'||dualHome;
+  $('panels').classList.toggle('board-wide',page === 'firmware' || page === 'can');
+  if(page!=='boards') panels().forEach(p=>p.navigate(page));
+  requestAnimationFrame(()=>globalThis.dispatchEvent(new Event('resize')));
+}
+function refreshHeaders() {
+  panels().forEach((p,i)=>{
+    const motor=i+1, s=p.snapshot();
+    if(!$('rpm-'+motor))return;
+    $('rpm-'+motor).textContent=Number.isFinite(s.velocity)?s.velocity.toFixed(1):'—';
+    $('pos-'+motor).textContent=Number.isFinite(s.position)?s.position.toFixed(1):'—';
+    $('stop-'+motor).disabled=!s.connected;
+    $('fault-'+motor).hidden=!s.connected||!s.fault||s.fault==='none';
+    $('fault-'+motor).textContent='Fault: '+s.fault;
+  });
+  panels().forEach((p,i)=>{
+    const m=i+1, s=p.snapshot(); if(!$('hrpm-'+m)) return;
+    $('hrpm-'+m).textContent=Number.isFinite(s.velocity)?s.velocity.toFixed(1):'—';
+    $('hpos-'+m).textContent=Number.isFinite(s.position)?s.position.toFixed(1):'—';
+    $('hstop-'+m).disabled=!s.connected;
+    $('hfault-'+m).hidden=!s.connected||!s.fault||s.fault==='none';
+    $('hfault-'+m).textContent='Fault: '+s.fault;
+  });
+  const snaps = panels().map(p => p.snapshot());
+  const anyActive = snaps.some(s => s.active);
+  const faults = snaps.map(s => s.fault).filter(f => f && f !== 'none');
+  $('shellActive').textContent = anyActive ? 'YES' : 'NO';
+  $('shellActive').classList.toggle('active', anyActive);
+  $('shellFault').textContent = faults.length ? faults.join(', ') : 'none';
+  $('shellFault').classList.toggle('fault', faults.length > 0);
+  $('dhFirmware').textContent = $('shellVersion').textContent;
+  $('dhActive').textContent = $('shellActive').textContent; $('dhActive').className = anyActive ? 'active' : '';
+  $('dhFault').textContent = $('shellFault').textContent; $('dhFault').className = faults.length ? 'fault' : '';
+}
+document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>navigate(b.dataset.page));
+document.querySelectorAll('.dh-link').forEach(b=>b.onclick=()=>navigate(b.dataset.goto));
+for (const m of [1,2]) {
+  $('hstop-'+m).onclick=()=>motorPanels[m-1]?.stop();
+}
+$('chooseSingle').onclick=()=>select('single');
+$('chooseDual').onclick=()=>select('dual');
+select('single'); state();
+
+</script>
+</body></html>
