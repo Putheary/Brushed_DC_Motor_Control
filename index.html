@@ -189,6 +189,14 @@ button{font-family:inherit}
   .motor-column + .motor-column { border-left: 2px solid #052202; padding-left: 20px; }
   .motor-column-header { font-weight: 700; font-size: 15px; margin-bottom: 10px; color: #1e2530; display: flex; align-items: center; gap: 8px; }
 
+  .manual-loops { display:grid; gap:16px; padding:12px; }
+  .manual-loop { min-width:0; padding:12px; background:#f5faf4; border:1px solid #829181; border-radius:6px; }
+  .manual-loop h3 { margin:0 0 12px; padding-bottom:6px; border-bottom:1px solid #b6c3b5; }
+  .gain-row { display:grid; grid-template-columns:3ch minmax(0, 90px) max-content; gap:6px; align-items:center; margin-bottom:4px; }
+  .gain-row label { width:auto; }
+  .gain-row input[type=number] { box-sizing:border-box; min-width:0; width:100%; }
+  .gain-row .unit { white-space:nowrap; }
+
   .dfu-note { background: #fff3cd; padding: 12px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
   .warn-note { background: #fdecea; border: 1px solid #f1b3ac; color: #7a1f14; padding: 12px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
   .hint-note { color: #555; font-size: 13px; max-width: 680px; margin: 0 0 18px; }
@@ -343,14 +351,14 @@ button{font-family:inherit}
   .mode-pill.active { background:#052202; color:white; }
   .inline-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
   .inline-controls label { width:auto; min-width:105px; }
-  .position-loop-control { display:grid; grid-template-columns:130px minmax(140px, 220px) 50px 130px; align-items:center; gap:8px; margin-bottom:10px; }
+  .position-loop-control { display:grid; grid-template-columns:130px minmax(140px, 220px) max-content; align-items:center; gap:8px; margin-bottom:10px; }
   .position-loop-control label { min-width:0; }
   .position-loop-control input { box-sizing:border-box; width:100%; }
   .controller-design-row { display:grid; grid-template-columns:145px minmax(100px, 180px) 110px; align-items:center; gap:8px; margin-bottom:10px; }
   .controller-design-row label { width:auto; }
   .controller-design-row input { box-sizing:border-box; width:100%; }
   @media (max-width:600px) {
-    .position-loop-control { grid-template-columns:110px minmax(0, 1fr) 50px; }
+    .position-loop-control { grid-template-columns:110px minmax(0, 1fr) max-content; }
     .position-loop-control button { grid-column:2 / 4; justify-self:start; }
     .controller-design-row { grid-template-columns:110px minmax(0, 1fr); }
     .controller-design-row button { grid-column:2; justify-self:start; }
@@ -658,18 +666,34 @@ button{font-family:inherit}
         Applying a target or starting a test can move the motor immediately. Secure the motor and clear the shaft before testing.
       </div>
       <div class="box">
-        <div class="box-header">Position Loop Tuning</div>
-        <div class="box-body">
-          <p class="hint-note">The position loop clamps its velocity reference between these independent limits.</p>
-          <div class="position-loop-control"><label for="posKpInput">Position Kp</label><input type="number" id="posKpInput" value="" placeholder="Enter Kp" min="0" step="0.01"><span class="unit">RPM/deg</span><button class="action apply-button" id="setPosKpBtn" disabled>Apply</button></div>
-          <div class="position-loop-control"><label for="posMaxRpmInput">Max velocity</label><input type="number" id="posMaxRpmInput" value="" placeholder="Enter RPM" min="1" step="1"><span class="unit">RPM</span><button class="action apply-button" id="setPosMaxRpmBtn" disabled>Apply</button></div>
-          <div class="position-loop-control"><label for="posMinRpmInput">Min velocity</label><input type="number" id="posMinRpmInput" value="" placeholder="Enter negative RPM" min="-300" max="0" step="1"><span class="unit">RPM</span><button class="action apply-button" id="setPosMinRpmBtn" disabled>Apply</button></div>
-          <hr style="margin:14px 0; border:0; border-top:1px solid #ddd;">
-          <p class="hint-note">Valid gains are required before sending a target. Direction testing is optional. Change Position Kp and observe the response below.</p>
-          <div class="inline-controls"><label for="positionTuneTargetInput">Desired position</label><input type="number" id="positionTuneTargetInput" value="0" step="1"><span class="unit">deg</span><button class="action" id="setPositionTuneTargetBtn" disabled>Set Target / Test</button></div>
-          <div class="inline-controls"><label for="positionTuneActual">Actual position</label><input type="text" id="positionTuneActual" value="—" readonly><span class="unit">deg</span></div>
-<div id="positionTuneStatus" class="small-status">After identification, set a target directly. Direction testing is optional.</div>
-          <div id="posTuneChartHost"></div>
+        <div class="box-header">Manual Tuning</div>
+        <div class="box-body manual-loops">
+          <section class="manual-loop">
+            <h3>Velocity loop</h3>
+            <p class="hint-note">Press Enter to send a gain or target. Stop the motor before changing velocity gains. Use Save to keep gains after power-up.</p>
+            <div class="inline-controls"><label for="manualKp">Kp</label><input type="number" id="manualKp" min="0" max="10" step="any"></div>
+            <div class="inline-controls"><label for="manualKi">Ki</label><input type="number" id="manualKi" min="0" max="150" step="any"></div>
+            <div class="inline-controls"><label for="manualKff">Kff</label><input type="number" id="manualKff" min="0.0001" max="1" step="any"></div>
+            <div class="inline-controls"><label for="manualTarget">Desired velocity</label><input type="number" step="any" id="manualTarget" value="0"><span>RPM</span></div>
+            <div class="inline-controls"><label for="manualActual">Measured velocity</label><input id="manualActual" type="text" value="—" readonly><span>RPM</span></div>
+            <p id="manualStatus" role="status"></p>
+            <div id="manualChartHost"></div>
+          </section>
+          <section class="manual-loop">
+            <h3>Position loop</h3>
+            <p class="hint-note">The position loop clamps its velocity reference between these independent limits.</p>
+            <div class="position-loop-control"><label for="posKpInput">Position Kp</label><input type="number" id="posKpInput" value="" placeholder="Enter Kp" min="0" step="0.01"><span class="unit">RPM/deg</span></div>
+            <div class="position-loop-control"><label for="manualKd">Position Kd</label><input type="number" id="manualKd" min="0" max="100" step="any"><span class="unit">RPM/(deg/s)</span></div>
+            <button class="action secondary" id="zeroPosition" disabled>Zero position</button>
+            <div class="position-loop-control"><label for="posMaxRpmInput">Max velocity</label><input type="number" id="posMaxRpmInput" value="" placeholder="Enter RPM" min="1" step="1"><span class="unit">RPM</span></div>
+            <div class="position-loop-control"><label for="posMinRpmInput">Min velocity</label><input type="number" id="posMinRpmInput" value="" placeholder="Enter negative RPM" min="-300" max="0" step="1"><span class="unit">RPM</span></div>
+            <hr style="margin:14px 0; border:0; border-top:1px solid #ddd;">
+            <p class="hint-note">Valid gains are required before sending a target. Direction testing is optional. Change Position Kp and observe the response below.</p>
+            <div class="inline-controls"><label for="positionTuneTargetInput">Desired position</label><input type="number" id="positionTuneTargetInput" value="0" step="1"><span class="unit">deg</span></div>
+            <div class="inline-controls"><label for="positionTuneActual">Actual position</label><input type="text" id="positionTuneActual" value="—" readonly><span class="unit">deg</span></div>
+            <div id="positionTuneStatus" class="small-status">Entering Position from Velocity sets the current shaft location to 0°.</div>
+            <div id="posTuneChartHost"></div>
+          </section>
         </div>
       </div>
 
@@ -678,7 +702,7 @@ button{font-family:inherit}
         Those values are applied to the velocity controller immediately and shown on the Testing tab.
         No manual gain entry is required.
       </p>
-      <p style="font-size:12px; color:#414b45;">Saving either section writes the current configuration to flash. Sensor settings include CPR, encoder sign, motor direction, and direction confirmation. Tuning settings include ζ, ω<sub>n</sub>, τ<sub>d</sub>, position Kp and velocity limits, plus valid identified velocity gains.</p>
+      <p style="font-size:12px; color:#414b45;">Saving either section writes the current configuration to flash. Sensor settings include CPR, encoder sign, motor direction, and direction confirmation. Tuning settings include ζ, ω<sub>n</sub>, τ<sub>d</sub>, position Kp and Kd, velocity limits, and valid velocity gains from automatic or manual tuning.</p>
       <div class="tab-config-actions">
         <span class="config-action-status" data-section="tuning" role="status" aria-live="polite"></span>
         <button class="action secondary restore-tab-config-btn" data-section="tuning">Restore</button>
@@ -763,15 +787,16 @@ button{font-family:inherit}
           <div class="motor-columns">
             <div class="motor-column">
               <div class="motor-column-header">Velocity Controller</div>
-              <label>Kp</label><input type="number" id="m1GainKp" step="0.0001" value="" readonly><br>
-              <label>Ki</label><input type="number" id="m1GainKi" step="0.0001" value="" readonly><br>
-              <label>Kff</label><input type="number" id="m1GainKff" step="0.0001" value="" readonly>
-              <p style="font-size:11px; color:#414b45; margin-top:6px;">Identified on the Tuning tab and currently active on the inner velocity loop.</p>
+              <div class="gain-row"><label for="m1GainKp">Kp</label><input type="number" id="m1GainKp" step="0.0001" value="" readonly></div>
+              <div class="gain-row"><label for="m1GainKi">Ki</label><input type="number" id="m1GainKi" step="0.0001" value="" readonly></div>
+              <div class="gain-row"><label for="m1GainKff">Kff</label><input type="number" id="m1GainKff" step="0.0001" value="" readonly></div>
+              <p style="font-size:11px; color:#414b45; margin-top:6px;">Active velocity gains from automatic or manual tuning.</p>
             </div>
             <div class="motor-column">
               <div class="motor-column-header">Position Controller</div>
-              <label>Kp</label><input type="number" id="posGainKp" step="0.01" value="" placeholder="Not set" readonly><span class="unit"> RPM/deg</span>
-              <p style="font-size:11px; color:#414b45; margin-top:6px;">Outer position loop gain, as applied on the Tuning tab.</p>
+              <div class="gain-row"><label for="posGainKp">Kp</label><input type="number" id="posGainKp" step="0.01" value="" placeholder="Not set" readonly><span class="unit"> RPM/deg</span></div>
+              <div class="gain-row"><label for="posGainKd">Kd</label><input type="number" id="posGainKd" step="any" placeholder="—" readonly><span class="unit"> RPM/(deg/s)</span></div>
+              <p style="font-size:11px; color:#414b45; margin-top:6px;">Active position gains from the Tuning tab.</p>
             </div>
           </div>
         </div>
@@ -972,7 +997,7 @@ function goToPage(pageName) {
     currentChart.resize();
     document.getElementById('motorsStatusBoard').textContent = dual ? 'Dual Motor' : 'Single Motor';
   }
-  if (pageName === 'tuning') { posTuneChart.resize(); if (writer) sendCommand('GET_CONFIG', true); }
+  if (pageName === 'tuning') { manualChart.resize(); posTuneChart.resize(); if (writer) sendCommand('GET_CONFIG', true); }
   if (pageName === 'blackbox') { logRunChart.resize(); }
   if (pageName === 'sensors') { sensorEncChart.resize(); }
 
@@ -1230,18 +1255,31 @@ async function sendCommand(cmd, quiet = false) {
     if (!quiet) log('> ' + cmd);
   } catch (error) {
     if (!quiet) log('Command failed: ' + error.message);
+    if (tabConfigRequestPending && /^(SET_CPR:|SAVE_SENSOR_CONFIG$|RESTORE_SENSOR_CONFIG$)/.test(cmd)) {
+      tabConfigRequestPending = null;
+      setConfigActionStatus('Sensor request failed: ' + error.message, true, 'sensors');
+    }
     if (/^(GET_AXIS_CAN|SET_AXIS_CAN:)/.test(cmd)) {
       canConfigRequestPending = null; showCanConfigStatus('CAN request failed: ' + error.message, 'error');
     }
   }
 }
 function setConnected(isConnected) {
-  if (!isConnected) clearCurrentReading('');
+  if (!isConnected) {
+    document.getElementById('manualActual').value = '—';
+    document.getElementById('posGainKd').value = '';
+    document.getElementById('manualKd').value = '';
+    document.getElementById('manualStatus').textContent = '';
+    manualChart.clear();
+    clearCurrentReading('');
+  }
   else clearCurrentReading('Waiting for current data from firmware…');
   if (!isConnected) resetCanConfig();
   else if (dual && motor === 1) showCanConfigStatus('Reading saved CAN settings from the board…');
   if (!isConnected) document.getElementById('positionTuneActual').value = '—';
   if (!isConnected) {
+  tabConfigRequestPending = null;
+  document.getElementById('m1CprInput').value = '';
   cancelCprMeasurement();
   lastEncoderCount = null;
   }
@@ -1252,7 +1290,7 @@ function setConnected(isConnected) {
 }
 // TELEM:  "TELEM:t_ms,ref,measured,running,reserved,active,fault_flags,encoder_count"
 // RLS:    "RLS:a,b,tau,K,kp,ki,samples,converged,valid,kff"
-// CONFIG: "CONFIG:cpr,zeta,omega,taud,kp,ki,kff,active,encoder_sign,direction_verified,pos_kp,pos_max_rpm,motor_direction,pos_min_rpm"
+// CONFIG: "CONFIG:cpr,zeta,omega,taud,kp,ki,kff,active,encoder_sign,direction_verified,pos_kp,pos_max_rpm,motor_direction,pos_min_rpm,pos_kd"
 // POSITION: "POSITION:measured,target,error,velocity_ref,at_target"
 let lastEncCpr = null;
 
@@ -1273,6 +1311,7 @@ const desiredValues = { Velocity: '0', Position: '0' };
 let latestVelocity = null;              // measured RPM from TELEM
 let latestPosition = { measured: null, target: null, error: null, velocityRef: null, atTarget: null };
 
+const POSITION_LIMIT_DEG = 46603 * 360;
 const MODE_INFO = {
   Velocity: { unit: 'RPM', button: 'Set Velocity', hint: '', step: '1' },
   Position: { unit: 'deg', button: 'Set Position', hint: '', step: '1' }
@@ -1353,39 +1392,81 @@ document.getElementById('setDesiredBtn').addEventListener('click', () => {
     return;
   }
   if (selectedControlMode === 'Position') {
-    if (value < 0 || value > 360) { alert('Enter an angle from 0 to 360 degrees (360 is one full turn from zero).'); return; }
+    if (Math.abs(value) > POSITION_LIMIT_DEG) { alert('Enter an angle between −16,777,080° and +16,777,080°.'); return; }
     document.getElementById('desiredInput').value = value;
     sendCommand('SET_POSITION:' + value);
   } else sendCommand('SET_DESIRED:' + value);
 });
+function onManualEnter(ids, submit) {
+  for (const id of ids) {
+    const input = document.getElementById(id);
+    input.title = 'Press Enter to send';
+    input.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' || event.isComposing || event.repeat) return;
+      event.preventDefault();
+      if (writer && !input.disabled) submit();
+    });
+  }
+}
+function manualNumber(id) {
+  const raw = document.getElementById(id).value.trim();
+  return raw ? Number(raw) : NaN;
+}
+function showManualStatus(text) { document.getElementById('manualStatus').textContent = text; }
+onManualEnter(['manualKp', 'manualKi', 'manualKff'], () => {
+  const values = ['manualKp','manualKi','manualKff'].map(manualNumber);
+  const [kp, ki, kff] = values;
+  if (!values.every(Number.isFinite) || kp < 0 || kp > 10 || ki < 0 || ki > 150 || kff < 0.0001 || kff > 1) {
+    showManualStatus('Enter Kp from 0 to 10, Ki from 0 to 150, and Kff from 0.0001 to 1.'); return;
+  }
+  sendCommand('SET_VEL_GAINS:' + values.join(','));
+});
+onManualEnter(['manualKd'], () => {
+  const kd = manualNumber('manualKd');
+  if (!Number.isFinite(kd) || kd < 0 || kd > 100) { alert('Enter Kd from 0 to 100.'); return; }
+  sendCommand('SET_POS_KD:' + kd);
+});
+onManualEnter(['manualTarget'], () => {
+  const rpm = manualNumber('manualTarget');
+  if (!Number.isFinite(rpm)) { showManualStatus('Enter a finite velocity in RPM.'); return; }
+  sendCommand('SET_DESIRED:' + rpm);
+});
+document.getElementById('zeroPosition').addEventListener('click', () => sendCommand('ZERO_POSITION'));
+function syncManualGains(kp, ki, kff, kd) {
+  const reportedKd = kd !== undefined && kd !== '' && Number.isFinite(Number(kd)) ? Number(kd) : '';
+  document.getElementById('posGainKd').value = reportedKd;
+  document.getElementById('manualKd').value = reportedKd;
+  for (const [id, value] of Object.entries({manualKp:kp, manualKi:ki, manualKff:kff})) {
+    if (value !== undefined && Number.isFinite(Number(value))) document.getElementById(id).value = Number(value);
+  }
+}
 let pendingPosKp = null;
-document.getElementById('setPosKpBtn').addEventListener('click', () => {
-  const v = Number(document.getElementById('posKpInput').value);
-  if (!Number.isFinite(v) || v < 0) { alert('Position Kp must be non-negative.'); return; }
+onManualEnter(['posKpInput'], () => {
+  const v = manualNumber('posKpInput');
+  if (!Number.isFinite(v) || v < 0 || v > 100) { alert('Enter position Kp from 0 to 100.'); return; }
   pendingPosKp = v;
   sendCommand('SET_POS_KP:' + v);
 });
-document.getElementById('setPosMaxRpmBtn').addEventListener('click', () => {
+onManualEnter(['posMaxRpmInput'], () => {
   const v = Number(document.getElementById('posMaxRpmInput').value);
   if (!Number.isFinite(v) || v <= 0 || v > 300) { alert('Maximum velocity must be greater than 0 and no more than 300 RPM.'); return; }
   sendCommand('SET_POS_MAX_RPM:' + v);
 });
-document.getElementById('setPosMinRpmBtn').addEventListener('click', () => {
+onManualEnter(['posMinRpmInput'], () => {
   const raw = document.getElementById('posMinRpmInput').value.trim();
   const v = Number(raw);
   if (!raw || !Number.isFinite(v) || v < -300 || v > 0) { alert('Minimum velocity must be between -300 RPM and 0 RPM.'); return; }
   sendCommand('SET_POS_MIN_RPM:' + v);
 });
-document.getElementById('setPositionTuneTargetBtn').addEventListener('click', async () => {
+onManualEnter(['positionTuneTargetInput'], async () => {
   if (!writer) { alert('Connect to the controller first.'); return; }
   const raw = document.getElementById('positionTuneTargetInput').value.trim();
   const target = Number(raw);
-  if (!raw || !Number.isFinite(target) || target < 0 || target > 360) {
-    alert('Enter an angle from 0 to 360 degrees (360 is one full turn from zero).'); return;
+  if (!raw || !Number.isFinite(target) || Math.abs(target) > POSITION_LIMIT_DEG) {
+    alert('Enter an angle between −16,777,080° and +16,777,080°.'); return;
   }
   posTuneChart.clear();
   document.getElementById('positionTuneStatus').textContent = 'Switching to Position mode and applying target...';
-  await sendCommand('SET_MODE:POSITION');
   await sendCommand('SET_POSITION:' + target);
   document.getElementById('positionTuneTargetInput').value = target;
   document.getElementById('positionTuneStatus').textContent = 'Position test requested: target ' + target + ' deg. Continuous position: 360 deg is one full turn from zero.';
@@ -1421,6 +1502,23 @@ function acceptCurrentResponse(payload) {
 function handleLine(line) {
   if (line.startsWith('CURRENT:')) { acceptCurrentResponse(line.substring(8)); return; }
   if (line.startsWith('POSITION:')) { acceptPositionResponse(line.substring(9)); return; }
+  if (line === 'OK:VEL_GAINS' || line === 'OK:POS_KD') {
+    if (line === 'OK:VEL_GAINS') showManualStatus('Velocity gains applied.');
+    else document.getElementById('positionTuneStatus').textContent = 'Position Kd applied.';
+    sendCommand('GET_CONFIG', true); return;
+  }
+  if (line === 'OK:POSITION_ZERO') {
+    desiredValues.Position = '0';
+    if (selectedControlMode === 'Position') document.getElementById('desiredInput').value = '0';
+    document.getElementById('positionTuneTargetInput').value = '0';
+    posTuneChart.clear(); posChart.clear();
+    document.getElementById('positionTuneStatus').textContent = 'Position zero set.';
+    sendCommand('GET_POSITION', true); return;
+  }
+  if (line === 'ERR:BAD_VEL_GAINS' || line === 'ERR:GAINS_BUSY') {
+    showManualStatus(line === 'ERR:GAINS_BUSY' ? 'Stop this motor before applying gains.' : 'Firmware rejected the velocity gains.'); return;
+  }
+  if (line === 'ERR:BAD_POS_KD') { document.getElementById('positionTuneStatus').textContent = 'Firmware rejected Kd.'; return; }
   if (line.startsWith('CAN_CONFIG:')) {
     const savedToFlash = canConfigRequestPending === 'saved-read';
     const restored = canConfigRequestPending === 'restore';
@@ -1460,6 +1558,10 @@ function handleLine(line) {
     if (motorDirectionRaw !== undefined && (Number(motorDirectionRaw) === 1 || Number(motorDirectionRaw) === -1)) {
       setMotorDirection(Number(motorDirectionRaw) < 0 ? '-1' : '1');
     }
+    if (tabConfigRequestPending === 'restore-sensors') {
+      document.getElementById('m1CprInput').value = String(cpr);
+      document.getElementById('cprCalibrationStatus').textContent = 'Restored saved CPR: ' + cpr;
+    }
     directionVerified = verified;
     updateDirectionUI();
     tabConfigRequestPending = null;
@@ -1473,7 +1575,8 @@ function handleLine(line) {
       setConfigActionStatus('Firmware returned invalid tuning settings.', true);
       return;
     }
-    const [zeta, omega, taud, kp, ki, kff, posKp, posMaxRpm, gainsValid, posMinRpm] = values;
+    const [zeta, omega, taud, kp, ki, kff, posKp, posMaxRpm, gainsValid, posMinRpm, posKd] = values;
+    syncManualGains(kp, ki, kff, posKd);
     document.getElementById('m1ZetaInput').value = zeta;
     document.getElementById('m1OmegaInput').value = omega;
     document.getElementById('m1TauDInput').value = taud;
@@ -1535,6 +1638,18 @@ function handleLine(line) {
   if (line === 'OK:ZETA' || line === 'OK:OMEGA_N') { sendCommand('GET_CONFIG', true); cliEcho(line + ' — readback requested', 'rx'); return; }
   if (line === 'ERR:BAD_ZETA') { alert('ζ must be greater than 0.'); return; }
   if (line === 'ERR:BAD_OMEGA_N') { alert('ωₙ must be greater than 0.'); return; }
+  if (tabConfigRequestPending === 'apply-cpr-sensors' && line === 'OK:CPR') {
+    tabConfigRequestPending = 'save-sensors';
+    setConfigActionStatus('CPR applied. Saving to flash…', false, 'sensors');
+    sendCommand('SAVE_SENSOR_CONFIG');
+    sendCommand('GET_CONFIG', true);
+    return;
+  }
+  if (tabConfigRequestPending === 'apply-cpr-sensors' && line === 'ERR:BAD_CPR') {
+    tabConfigRequestPending = null;
+    setConfigActionStatus('The controller rejected the CPR. Correct the value and save again.', true, 'sensors');
+    return;
+  }
   if (line === 'OK:CPR' || line === 'OK:POS_KP' || line === 'OK:POS_MAX_RPM' || line === 'OK:POS_MIN_RPM') { sendCommand('GET_CONFIG', true); cliEcho(line + ' — readback requested', 'rx'); return; }
   if (line === 'ERR:BAD_POS_MIN_RPM') { alert('Minimum velocity must be between -300 RPM and 0 RPM.'); return; }
   if (line === 'OK:SAVED') { cliEcho('Configuration saved to flash.', 'rx'); sendCommand('GET_CONFIG', true); return; }
@@ -1564,6 +1679,8 @@ function handleLine(line) {
 
     setFirmwareMode(firmwareMode);
     latestVelocity = velN;
+    document.getElementById('manualActual').value = velN.toFixed(2);
+    if (document.getElementById('page-tuning').classList.contains('active')) manualChart.add(tN, refN, velN);
     if (selectedControlMode === 'Velocity') refreshMeasured();
     const modeName = FW_MODE_NAMES[firmwareMode];
     const stateStr = !activeNow
@@ -1632,13 +1749,15 @@ function handleLine(line) {
   if (line.startsWith('CONFIG:')) {
     const parts = line.substring(7).split(',');
     if (parts.length >= 8) {
-      const [cpr, zeta, omega, taud, kp, ki, kff, active, encoderSign, directionVerifiedField, posKp, posMaxRpm, motorDirection, posMinRpm] = parts;
+      const [cpr, zeta, omega, taud, kp, ki, kff, active, encoderSign, directionVerifiedField, posKp, posMaxRpm, motorDirection, posMinRpm, posKd] = parts;
+      syncManualGains(kp, ki, kff, posKd);
       lastConfig = {
         cpr: parseFloat(cpr), zeta: parseFloat(zeta), omega: parseFloat(omega), taud: parseFloat(taud),
         kp: parseFloat(kp), ki: parseFloat(ki), kff: parseFloat(kff),
         active: active === '1',
         encoderSign: parseInt(encoderSign, 10),
         directionVerified: directionVerifiedField === '1',
+        posKd: posKd === undefined ? undefined : Number(posKd),
         posKp: posKp === undefined ? undefined : parseFloat(posKp),
         posMaxRpm: posMaxRpm === undefined ? undefined : parseFloat(posMaxRpm),
         motorDirection: motorDirection === undefined ? 1 : parseInt(motorDirection, 10),
@@ -1859,7 +1978,7 @@ function handleLine(line) {
   }
   if (line === 'OK:DIRECTION_TEST_STARTED') { directionTestActive = true; setActiveUI(isActive); document.getElementById('directionStartBtn').disabled = true; document.getElementById('directionStopBtn').disabled = false; document.getElementById('directionStatus').textContent = 'Test running'; return; }
   if (line === 'OK:DIRECTION_TEST_STOPPED') { directionTestActive = false; setActiveUI(isActive); document.getElementById('directionStartBtn').disabled = !writer; document.getElementById('directionStopBtn').disabled = true; document.getElementById('flipEncoderBtn').disabled = true; document.getElementById('confirmDirectionBtn').disabled = true; document.getElementById('directionStatus').textContent = 'Test stopped — motor remains active'; return; }
-  if (line === 'ERR:NO_GAINS') alert('Normal control is unavailable because valid gains are not available. Run motor identification or check the saved gains.');
+  if (line === 'ERR:NO_GAINS') alert('Normal control is unavailable because valid gains are not available. Use Manual Tuning to apply valid velocity gains, run motor identification, or restore saved gains.');
 
 }
 
@@ -1872,10 +1991,11 @@ function setActiveUI(active) {
   document.getElementById('homeActive').textContent = active ? 'YES' : 'NO';
   document.getElementById('motorActiveLabel').textContent = active ? 'ACTIVE' : 'STOPPED';
   document.getElementById('setDesiredBtn').disabled = !writer;
-  document.getElementById('setPosKpBtn').disabled = !writer;
-  document.getElementById('setPosMaxRpmBtn').disabled = !writer;
-  document.getElementById('setPosMinRpmBtn').disabled = !writer;
-  document.getElementById('setPositionTuneTargetBtn').disabled = !writer;
+  for (const id of ['manualKp', 'manualKi', 'manualKff']) document.getElementById(id).disabled = !writer || active;
+  for (const id of ['manualKd', 'manualTarget', 'zeroPosition', 'posKpInput',
+                    'posMaxRpmInput', 'posMinRpmInput', 'positionTuneTargetInput']) {
+    document.getElementById(id).disabled = !writer;
+  }
   document.getElementById('directionStartBtn').disabled = !writer || directionTestActive;
   document.getElementById('stopBtn').disabled = !writer;
   document.getElementById('applyMotorDirectionBtn').disabled = active || directionTestActive || !writer;
@@ -1978,41 +2098,23 @@ document.getElementById('confirmDirectionBtn').addEventListener('click', async (
 });
 
 // ---------------- Tuning ----------------
-document.getElementById('m1ApplyCprBtn')
-  .addEventListener('click', async () => {
-
-    if (!writer) {
-      alert('Connect to the controller first.');
-      return;
-    }
-
-    if (isActive) {
-      alert('Stop the motor before changing CPR.');
-      return;
-    }
-
-    const raw = document.getElementById('m1CprInput').value.trim();
-    const cpr = Number(raw);
-
-    if (!raw || !Number.isFinite(cpr) || cpr <= 0) {
-      alert('Encoder CPR must be a positive number.');
-      return;
-    }
-
-    try {
-      await sendCommand('SET_CPR:' + cpr);
-      await sendCommand('SAVE_SENSOR_CONFIG');
-
-      document.getElementById('cprCalibrationStatus').textContent =
-        'CPR applied. Saving sensor configuration...';
-
-    } catch (error) {
-      document.getElementById('cprCalibrationStatus').textContent =
-        'Failed to apply CPR.';
-      log('CPR calibration error: ' + error);
-    }
+async function saveSensorSettings(requireCpr = false) {
+  const status = message => setConfigActionStatus(message, true, 'sensors');
+  if (!writer) return status('Connect to the controller first.');
+  if (tabConfigRequestPending) return status('Wait for the current settings request to finish.');
+  if (isActive || cprCalibrationStartCount !== null) return status('Stop the motor and finish the measurement before saving.');
+  const input = document.getElementById('m1CprInput');
+  const raw = input.value.trim();
+  const cpr = Number(raw);
+  if (input.validity?.badInput || ((raw || requireCpr) && !(Number.isFinite(cpr) && cpr > 0))) {
+    return status('Enter a positive CPR before saving.');
   }
-);
+  tabConfigStatusSection = 'sensors';
+  tabConfigRequestPending = raw ? 'apply-cpr-sensors' : 'save-sensors';
+  setConfigActionStatus(raw ? 'Applying CPR…' : 'Saving sensor settings…', false, 'sensors');
+  await sendCommand(raw ? 'SET_CPR:' + cpr : 'SAVE_SENSOR_CONFIG');
+}
+document.getElementById('m1ApplyCprBtn').addEventListener('click', () => saveSensorSettings(true));
 
 document.getElementById('startCprCalibrationBtn')
   .addEventListener('click', () => {
@@ -2077,7 +2179,7 @@ document.getElementById('finishCprCalibrationBtn')
 
     document.getElementById('cprCalibrationStatus').textContent =
       'Measured CPR: ' + measuredCpr +
-      '. Check the value, then press Enter in the measured CPR field to apply and save.';
+      '. Check the value, then click Save or press Enter to store it.';
 
     cprCalibrationStartCount = null;
   }
@@ -2138,11 +2240,7 @@ bindEnterToApply(['m1CprInput'], 'm1ApplyCprBtn');
 bindEnterToApply(['m1TauDInput'], 'm1ApplyTauDBtn');
 bindEnterToApply(['m1ZetaInput'], 'm1ApplyZetaBtn');
 bindEnterToApply(['m1OmegaInput'], 'm1ApplyOmegaBtn');
-bindEnterToApply(['posKpInput'], 'setPosKpBtn');
-bindEnterToApply(['posMaxRpmInput'], 'setPosMaxRpmBtn');
-bindEnterToApply(['posMinRpmInput'], 'setPosMinRpmBtn');
 bindEnterToApply(['desiredInput'], 'setDesiredBtn');
-bindEnterToApply(['positionTuneTargetInput'], 'setPositionTuneTargetBtn');
 document.getElementById('applyMotorDirectionBtn').hidden = true;
 document.getElementById('motorDirectionButton').title = 'Click a direction to apply';
 document.getElementById('motorDirectionStatus').textContent = 'Click Normal or Reversed to apply.';
@@ -2293,6 +2391,8 @@ document.getElementById('importConfigBtn').addEventListener('click', async () =>
       if (cfg.omega !== undefined) await sendCommand('SET_OMEGA_N:' + Number(cfg.omega));
     }
     if (cfg.taud !== undefined) await sendCommand('SET_TAUD:' + Number(cfg.taud));
+    if (cfg.posKd !== undefined) await sendCommand('SET_POS_KD:' + Number(cfg.posKd));
+    if ([cfg.kp,cfg.ki,cfg.kff].every(Number.isFinite) && cfg.kff >= 0.0001) await sendCommand('SET_VEL_GAINS:' + [cfg.kp,cfg.ki,cfg.kff].join(','));
     if (cfg.posKp !== undefined) await sendCommand('SET_POS_KP:' + Number(cfg.posKp));
     if (cfg.posMaxRpm !== undefined) await sendCommand('SET_POS_MAX_RPM:' + Number(cfg.posMaxRpm));
     const positionMinRpm = cfg.posMinRpm ?? cfg.positionMinRpm;
@@ -2361,6 +2461,7 @@ document.querySelectorAll('.restore-tab-config-btn').forEach(button => {
     const section = button.dataset.section;
     tabConfigStatusSection = section;
     if (!writer) { setConfigActionStatus('Connect to the controller first.', true, section); return; }
+    if (tabConfigRequestPending || (section === 'sensors' && cprCalibrationStartCount !== null)) return;
     tabConfigRequestPending = 'restore-' + section;
     setConfigActionStatus('Restoring saved ' + section + ' settings from flash...');
     sendCommand(section === 'sensors' ? 'RESTORE_SENSOR_CONFIG' : 'RESTORE_TUNING_CONFIG');
@@ -2371,6 +2472,8 @@ document.querySelectorAll('.save-tab-config-btn').forEach(button => {
     const section = button.dataset.section;
     tabConfigStatusSection = section;
     if (!writer) { setConfigActionStatus('Connect to the controller first.', true, section); return; }
+    if (section === 'sensors') { void saveSensorSettings(); return; }
+    if (tabConfigRequestPending) return;
     tabConfigRequestPending = 'save-' + section;
     setConfigActionStatus('Saving ' + section + ' settings to flash...');
     sendCommand(section === 'sensors' ? 'SAVE_SENSOR_CONFIG' : 'SAVE_TUNING_CONFIG');
@@ -2714,7 +2817,8 @@ function createChartCard(hostId, key, cfg) {
 const currentChart = createChartCard('currentChartHost', 'current', { title: 'Current Response', subtitle: 'Estimated shunt current', showRef: false, unit: 'A', minSpan: 0.2 });
 const velChart = createChartCard('velChartHost', 'vel', { title: 'Velocity Response', subtitle: 'Reference vs measured velocity', refLabel: 'Reference', unit: 'RPM', minSpan: 20 });
 const posChart = createChartCard('posChartHost', 'pos', { title: 'Position Response', subtitle: 'Target vs measured angle', refLabel: 'Target', unit: 'deg', minSpan: 10 });
-const posTuneChart = createChartCard('posTuneChartHost', 'postune', { title: 'Position Tuning Response', subtitle: 'Adjust Position Kp and compare target vs measured angle', refLabel: 'Target', unit: 'deg', minSpan: 10 });
+const manualChart = createChartCard('manualChartHost', 'manualVel', { title: 'Velocity tuning response', subtitle: 'Command and measured speed', refLabel: 'Command', unit: 'RPM', minSpan: 20 });
+const posTuneChart = createChartCard('posTuneChartHost', 'postune', { title: 'Position Tuning Response', subtitle: 'Target and measured angle', refLabel: 'Target', unit: 'deg', minSpan: 10 });
 const logRunChart    = makeChart('logRunChart');
 const sensorEncChart = makeChart('sensorEncChart', { showRef: false, minSpan: 50 });
 
