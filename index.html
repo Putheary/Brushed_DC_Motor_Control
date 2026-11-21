@@ -694,8 +694,8 @@ button{font-family:inherit}
             <button class="action" id="zeroPosition" disabled>Zero position</button>
             <div class="command-limits">
               <div>
-            <div class="position-loop-control"><label for="posMaxRpmInput">Max velocity</label><input type="number" id="posMaxRpmInput" value="" placeholder="Enter RPM" min="1" step="1"><span class="unit">RPM</span></div>
-            <div class="position-loop-control"><label for="posMinRpmInput">Min velocity</label><input type="number" id="posMinRpmInput" value="" placeholder="Enter negative RPM" min="-300" max="0" step="1"><span class="unit">RPM</span></div>
+            <div class="position-loop-control"><label for="posMaxRpmInput">Max velocity</label><input type="number" id="posMaxRpmInput" value="" placeholder="Enter RPM" min="0" max="1000" step="any"><span class="unit">RPM</span></div>
+            <div class="position-loop-control"><label for="posMinRpmInput">Min velocity</label><input type="number" id="posMinRpmInput" value="" placeholder="Enter negative RPM" min="-1000" max="0" step="1"><span class="unit">RPM</span></div>
               </div>
               <div>
                 <div class="position-loop-control"><label for="maxTargetDeg">Max position</label><input id="maxTargetDeg" type="number" step="any" disabled><span class="unit">deg</span></div>
@@ -1509,13 +1509,13 @@ onManualEnter(['posKpInput'], () => {
 });
 onManualEnter(['posMaxRpmInput'], () => {
   const v = Number(document.getElementById('posMaxRpmInput').value);
-  if (!Number.isFinite(v) || v <= 0 || v > 300) { alert('Maximum velocity must be greater than 0 and no more than 300 RPM.'); return; }
+  if (!Number.isFinite(v) || v <= 0 || v > 1000) { alert('Maximum velocity must be greater than 0 and no more than 1000 RPM.'); return; }
   sendCommand('SET_POS_MAX_RPM:' + v);
 });
 onManualEnter(['posMinRpmInput'], () => {
   const raw = document.getElementById('posMinRpmInput').value.trim();
   const v = Number(raw);
-  if (!raw || !Number.isFinite(v) || v < -300 || v > 0) { alert('Minimum velocity must be between -300 RPM and 0 RPM.'); return; }
+  if (!raw || !Number.isFinite(v) || v < -1000 || v > 0) { alert('Minimum velocity must be between -1000 RPM and 0 RPM.'); return; }
   sendCommand('SET_POS_MIN_RPM:' + v);
 });
 onManualEnter(['positionTuneTargetInput'], async () => {
@@ -1725,7 +1725,7 @@ function handleLine(line) {
     return;
   }
   if (line === 'OK:CPR' || line === 'OK:POS_KP' || line === 'OK:POS_MAX_RPM' || line === 'OK:POS_MIN_RPM') { sendCommand('GET_CONFIG', true); cliEcho(line + ' — readback requested', 'rx'); return; }
-  if (line === 'ERR:BAD_POS_MIN_RPM') { alert('Minimum velocity must be between -300 RPM and 0 RPM.'); return; }
+  if (line === 'ERR:BAD_POS_MIN_RPM') { alert('Minimum velocity must be between -1000 RPM and 0 RPM.'); return; }
   if (line === 'OK:SAVED') { cliEcho('Configuration saved to flash.', 'rx'); sendCommand('GET_CONFIG', true); return; }
   if (line.startsWith('POS_CONFIG:')) {
     const v = line.substring(11).split(',');
@@ -1837,7 +1837,7 @@ function handleLine(line) {
         posKp: posKp === undefined ? undefined : parseFloat(posKp),
         posMaxRpm: posMaxRpm === undefined ? undefined : parseFloat(posMaxRpm),
         motorDirection: motorDirection === undefined ? 1 : parseInt(motorDirection, 10),
-        posMinRpm: posMinRpm === undefined ? -(parseFloat(posMaxRpm) || 300) : parseFloat(posMinRpm)
+        posMinRpm: posMinRpm === undefined ? -(parseFloat(posMaxRpm) || 1000) : parseFloat(posMinRpm)
       };
       if (recording) recordSample({
         record_type: 'CONFIG', t_s: lastTelemetryTime,
