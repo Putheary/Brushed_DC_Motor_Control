@@ -14,6 +14,9 @@ button{font-family:inherit}
 .connect-toggle.connected{color:#fff;font-weight:600}
 .connect-toggle.connected::before{background:green}
 .connect-toggle:disabled,.stop:disabled{opacity:.5;cursor:not-allowed}
+.stop:not(:disabled):active,.motor-actions button:not(:disabled):active{transform:translateY(1px);filter:brightness(.82)}
+#stopResult{font-size:12px;line-height:1.4;margin-top:6px}
+#stopResult:empty{display:none}
 .board-toggle{display:flex;gap:6px;margin-top:10px}
 .board-toggle span{flex:1;padding:7px;border-radius:6px;border:1px solid #2a3240;background:transparent;color:#8b95a3;font-size:12px;text-align:center;cursor:default;user-select:none;pointer-events:none}
 .board-toggle span[aria-pressed=false]{display:none}
@@ -98,7 +101,7 @@ button{font-family:inherit}
 <div class="sidebar-header"><h1>Motor Controller</h1>
 <button class="connect-toggle" id="connect">Connect USB</button>
 <div class="board-toggle" role="status" aria-label="Selected board type (change it on the Board page)"><span id="single" aria-pressed="true">Single motor</span><span id="dual" aria-pressed="false">Dual motor</span></div>
-<button class="stop" id="stop" disabled>■ &nbsp;Stop all</button></div>
+<button class="stop" id="stop" disabled>■ &nbsp;Stop all</button><div id="stopResult" role="status"></div></div>
 <div class="sidebar-status">
 <div class="srow"><span>Connection</span><span id="status">Disconnected</span></div>
 <div class="srow"><span>Firmware</span><span id="shellVersion">-</span></div>
@@ -352,6 +355,10 @@ button{font-family:inherit}
   .inline-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
   .inline-controls label { width:auto; min-width:105px; }
   .position-loop-control { display:grid; grid-template-columns:130px minmax(140px, 220px) max-content; align-items:center; gap:8px; margin-bottom:10px; }
+  #zeroPosition { display:block; padding:4px 9px; font-size:12px; line-height:1.25; margin:0 0 10px; }
+  .command-limits { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr)); gap:0 14px; }
+  .command-limits .position-loop-control { grid-template-columns:max-content minmax(50px,1fr) 3ch; }
+  .command-limits .position-loop-control label { width:auto; }
   .position-loop-control label { min-width:0; }
   .position-loop-control input { box-sizing:border-box; width:100%; }
   .controller-design-row { display:grid; grid-template-columns:145px minmax(100px, 180px) 110px; align-items:center; gap:8px; margin-bottom:10px; }
@@ -671,9 +678,9 @@ button{font-family:inherit}
           <section class="manual-loop">
             <h3>Velocity loop</h3>
             <p class="hint-note">Press Enter to send a gain or target. Stop the motor before changing velocity gains. Use Save to keep gains after power-up.</p>
-            <div class="inline-controls"><label for="manualKp">Kp</label><input type="number" id="manualKp" min="0" max="10" step="any"></div>
-            <div class="inline-controls"><label for="manualKi">Ki</label><input type="number" id="manualKi" min="0" max="150" step="any"></div>
-            <div class="inline-controls"><label for="manualKff">Kff</label><input type="number" id="manualKff" min="0.0001" max="1" step="any"></div>
+            <div class="inline-controls"><label for="manualKp">Kp</label><input type="number" id="manualKp" step="any"></div>
+            <div class="inline-controls"><label for="manualKi">Ki</label><input type="number" id="manualKi" step="any"></div>
+            <div class="inline-controls"><label for="manualKff">Kff</label><input type="number" id="manualKff" step="any"></div>
             <div class="inline-controls"><label for="manualTarget">Desired velocity</label><input type="number" step="any" id="manualTarget" value="0"><span>RPM</span></div>
             <div class="inline-controls"><label for="manualActual">Measured velocity</label><input id="manualActual" type="text" value="—" readonly><span>RPM</span></div>
             <p id="manualStatus" role="status"></p>
@@ -684,9 +691,18 @@ button{font-family:inherit}
             <p class="hint-note">The position loop clamps its velocity reference between these independent limits.</p>
             <div class="position-loop-control"><label for="posKpInput">Position Kp</label><input type="number" id="posKpInput" value="" placeholder="Enter Kp" min="0" step="0.01"><span class="unit">RPM/deg</span></div>
             <div class="position-loop-control"><label for="manualKd">Position Kd</label><input type="number" id="manualKd" min="0" max="100" step="any"><span class="unit">RPM/(deg/s)</span></div>
-            <button class="action secondary" id="zeroPosition" disabled>Zero position</button>
+            <button class="action" id="zeroPosition" disabled>Zero position</button>
+            <div class="command-limits">
+              <div>
             <div class="position-loop-control"><label for="posMaxRpmInput">Max velocity</label><input type="number" id="posMaxRpmInput" value="" placeholder="Enter RPM" min="1" step="1"><span class="unit">RPM</span></div>
             <div class="position-loop-control"><label for="posMinRpmInput">Min velocity</label><input type="number" id="posMinRpmInput" value="" placeholder="Enter negative RPM" min="-300" max="0" step="1"><span class="unit">RPM</span></div>
+              </div>
+              <div>
+                <div class="position-loop-control"><label for="maxTargetDeg">Max position</label><input id="maxTargetDeg" type="number" step="any" disabled><span class="unit">deg</span></div>
+                <div class="position-loop-control"><label for="minTargetDeg">Min position</label><input id="minTargetDeg" type="number" step="any" disabled><span class="unit">deg</span></div>
+              </div>
+            </div>
+            <div id="limitStatus" class="small-status" role="status"></div>
             <hr style="margin:14px 0; border:0; border-top:1px solid #ddd;">
             <p class="hint-note">Valid gains are required before sending a target. Direction testing is optional. Change Position Kp and observe the response below.</p>
             <div class="inline-controls"><label for="positionTuneTargetInput">Desired position</label><input type="number" id="positionTuneTargetInput" value="0" step="1"><span class="unit">deg</span></div>
@@ -1255,9 +1271,14 @@ async function sendCommand(cmd, quiet = false) {
     if (!quiet) log('> ' + cmd);
   } catch (error) {
     if (!quiet) log('Command failed: ' + error.message);
-    if (tabConfigRequestPending && /^(SET_CPR:|SAVE_SENSOR_CONFIG$|RESTORE_SENSOR_CONFIG$)/.test(cmd)) {
+    if (cmd.startsWith('SET_POS_LIMITS:')) {
+      if (tabConfigRequestPending === 'apply-limits-tuning') tabConfigRequestPending = null;
+      document.getElementById('limitStatus').textContent = 'Could not send position limits.';
+    }
+    if (tabConfigRequestPending && /^(SET_CPR:|(?:SAVE|RESTORE)_(?:SENSOR|TUNING)_CONFIG$)/.test(cmd)) {
+      const section = tabConfigRequestPending.endsWith('sensors') ? 'sensors' : 'tuning';
       tabConfigRequestPending = null;
-      setConfigActionStatus('Sensor request failed: ' + error.message, true, 'sensors');
+      setConfigActionStatus('Settings request failed: ' + error.message, true, section);
     }
     if (/^(GET_AXIS_CAN|SET_AXIS_CAN:)/.test(cmd)) {
       canConfigRequestPending = null; showCanConfigStatus('CAN request failed: ' + error.message, 'error');
@@ -1266,6 +1287,7 @@ async function sendCommand(cmd, quiet = false) {
 }
 function setConnected(isConnected) {
   if (!isConnected) {
+    readLimits(undefined, undefined);
     document.getElementById('manualActual').value = '—';
     document.getElementById('posGainKd').value = '';
     document.getElementById('manualKd').value = '';
@@ -1278,6 +1300,10 @@ function setConnected(isConnected) {
   else if (dual && motor === 1) showCanConfigStatus('Reading saved CAN settings from the board…');
   if (!isConnected) document.getElementById('positionTuneActual').value = '—';
   if (!isConnected) {
+  if (tabConfigRequestPending) {
+    const section = tabConfigRequestPending.endsWith('sensors') ? 'sensors' : 'tuning';
+    setConfigActionStatus('USB disconnected before the settings request was confirmed.', true, section);
+  }
   tabConfigRequestPending = null;
   document.getElementById('m1CprInput').value = '';
   cancelCprMeasurement();
@@ -1312,6 +1338,41 @@ let latestVelocity = null;              // measured RPM from TELEM
 let latestPosition = { measured: null, target: null, error: null, velocityRef: null, atTarget: null };
 
 const POSITION_LIMIT_DEG = 46603 * 360;
+let activeLimits = null;
+function validLimits(low, high) {
+  return Number.isFinite(low) && Number.isFinite(high) && low >= -POSITION_LIMIT_DEG &&
+    high <= POSITION_LIMIT_DEG && low <= high;
+}
+function readLimits(low, high, force = false) {
+  const supported = low !== undefined && high !== undefined && validLimits(Number(low), Number(high));
+  const firstRead = !activeLimits && supported;
+  const changed = !activeLimits || Number(low) !== activeLimits.low || Number(high) !== activeLimits.high;
+  activeLimits = supported ? {low:Number(low), high:Number(high)} : null;
+  for (const [id,key] of [['minTargetDeg','low'],['maxTargetDeg','high']]) {
+    const input = document.getElementById(id);
+    input.disabled = !supported;
+    if (force || changed || !supported) input.value = supported ? activeLimits[key] : '';
+  }
+  if (firstRead) document.getElementById('limitStatus').textContent = '';
+  if (!supported) document.getElementById('limitStatus').textContent = writer ? 'Position limits require matching firmware.' : '';
+}
+function targetAllowed(value) {
+  const low = activeLimits?.low ?? -POSITION_LIMIT_DEG;
+  const high = activeLimits?.high ?? POSITION_LIMIT_DEG;
+  if (Number.isFinite(value) && value >= low && value <= high) return true;
+  alert('Enter a position from ' + low + ' to ' + high + ' deg.');
+  return false;
+}
+function applyPositionLimits(save) {
+  const low = manualNumber('minTargetDeg'), high = manualNumber('maxTargetDeg');
+  if (!validLimits(low, high)) {
+    document.getElementById('limitStatus').textContent = 'Enter both limits within ±16,777,080 deg. Minimum must be at or below maximum.';
+    return;
+  }
+  if (save) tabConfigRequestPending = 'apply-limits-tuning';
+  sendCommand('SET_POS_LIMITS:' + low + ',' + high);
+}
+onManualEnter(['minTargetDeg','maxTargetDeg'], () => applyPositionLimits(false));
 const MODE_INFO = {
   Velocity: { unit: 'RPM', button: 'Set Velocity', hint: '', step: '1' },
   Position: { unit: 'deg', button: 'Set Position', hint: '', step: '1' }
@@ -1392,7 +1453,7 @@ document.getElementById('setDesiredBtn').addEventListener('click', () => {
     return;
   }
   if (selectedControlMode === 'Position') {
-    if (Math.abs(value) > POSITION_LIMIT_DEG) { alert('Enter an angle between −16,777,080° and +16,777,080°.'); return; }
+    if (!targetAllowed(value)) return;
     document.getElementById('desiredInput').value = value;
     sendCommand('SET_POSITION:' + value);
   } else sendCommand('SET_DESIRED:' + value);
@@ -1415,9 +1476,8 @@ function manualNumber(id) {
 function showManualStatus(text) { document.getElementById('manualStatus').textContent = text; }
 onManualEnter(['manualKp', 'manualKi', 'manualKff'], () => {
   const values = ['manualKp','manualKi','manualKff'].map(manualNumber);
-  const [kp, ki, kff] = values;
-  if (!values.every(Number.isFinite) || kp < 0 || kp > 10 || ki < 0 || ki > 150 || kff < 0.0001 || kff > 1) {
-    showManualStatus('Enter Kp from 0 to 10, Ki from 0 to 150, and Kff from 0.0001 to 1.'); return;
+  if (!values.every(value => Number.isFinite(Math.fround(value)))) {
+    showManualStatus('Enter a finite motor gain in each field.'); return;
   }
   sendCommand('SET_VEL_GAINS:' + values.join(','));
 });
@@ -1462,9 +1522,7 @@ onManualEnter(['positionTuneTargetInput'], async () => {
   if (!writer) { alert('Connect to the controller first.'); return; }
   const raw = document.getElementById('positionTuneTargetInput').value.trim();
   const target = Number(raw);
-  if (!raw || !Number.isFinite(target) || Math.abs(target) > POSITION_LIMIT_DEG) {
-    alert('Enter an angle between −16,777,080° and +16,777,080°.'); return;
-  }
+  if (!targetAllowed(raw ? target : NaN)) return;
   posTuneChart.clear();
   document.getElementById('positionTuneStatus').textContent = 'Switching to Position mode and applying target...';
   await sendCommand('SET_POSITION:' + target);
@@ -1506,6 +1564,21 @@ function handleLine(line) {
     if (line === 'OK:VEL_GAINS') showManualStatus('Velocity gains applied.');
     else document.getElementById('positionTuneStatus').textContent = 'Position Kd applied.';
     sendCommand('GET_CONFIG', true); return;
+  }
+  if (line === 'OK:POS_LIMITS') {
+    document.getElementById('limitStatus').textContent = 'Position limits applied.';
+    if (tabConfigRequestPending === 'apply-limits-tuning') {
+      tabConfigRequestPending = 'save-tuning';
+      sendCommand('SAVE_TUNING_CONFIG');
+    }
+    sendCommand('GET_CONFIG', true);
+    return;
+  }
+  if (line === 'ERR:BAD_POS_LIMITS' || line === 'ERR:POS_LIMITS_BUSY') {
+    if (tabConfigRequestPending === 'apply-limits-tuning') tabConfigRequestPending = null;
+    document.getElementById('limitStatus').textContent = line.endsWith('BUSY') ?
+      'Stop the motor before changing position limits.' : 'The firmware rejected the position limits.';
+    return;
   }
   if (line === 'OK:POSITION_ZERO') {
     desiredValues.Position = '0';
@@ -1575,7 +1648,8 @@ function handleLine(line) {
       setConfigActionStatus('Firmware returned invalid tuning settings.', true);
       return;
     }
-    const [zeta, omega, taud, kp, ki, kff, posKp, posMaxRpm, gainsValid, posMinRpm, posKd] = values;
+    const [zeta, omega, taud, kp, ki, kff, posKp, posMaxRpm, gainsValid, posMinRpm, posKd, minTarget, maxTarget] = values;
+    readLimits(minTarget, maxTarget, true);
     syncManualGains(kp, ki, kff, posKd);
     document.getElementById('m1ZetaInput').value = zeta;
     document.getElementById('m1OmegaInput').value = omega;
@@ -1598,7 +1672,7 @@ function handleLine(line) {
       document.getElementById('m1GainKff').value = '';
       identifiedGains = null;
     }
-    lastConfig = { ...(lastConfig || {}), zeta, omega, taud, kp, ki, kff, posKp, posMaxRpm, posMinRpm };
+    lastConfig = { ...(lastConfig || {}), zeta, omega, taud, kp, ki, kff, posKp, posMaxRpm, posMinRpm, minTarget:activeLimits?.low, maxTarget:activeLimits?.high };
     tabConfigRequestPending = null;
     setConfigActionStatus('Tuning settings restored from flash.', false, 'tuning');
     cliEcho(line, 'rx');
@@ -1749,7 +1823,8 @@ function handleLine(line) {
   if (line.startsWith('CONFIG:')) {
     const parts = line.substring(7).split(',');
     if (parts.length >= 8) {
-      const [cpr, zeta, omega, taud, kp, ki, kff, active, encoderSign, directionVerifiedField, posKp, posMaxRpm, motorDirection, posMinRpm, posKd] = parts;
+      const [cpr, zeta, omega, taud, kp, ki, kff, active, encoderSign, directionVerifiedField, posKp, posMaxRpm, motorDirection, posMinRpm, posKd, minTarget, maxTarget] = parts;
+      readLimits(minTarget, maxTarget);
       syncManualGains(kp, ki, kff, posKd);
       lastConfig = {
         cpr: parseFloat(cpr), zeta: parseFloat(zeta), omega: parseFloat(omega), taud: parseFloat(taud),
@@ -1757,6 +1832,7 @@ function handleLine(line) {
         active: active === '1',
         encoderSign: parseInt(encoderSign, 10),
         directionVerified: directionVerifiedField === '1',
+        minTarget:activeLimits?.low, maxTarget:activeLimits?.high,
         posKd: posKd === undefined ? undefined : Number(posKd),
         posKp: posKp === undefined ? undefined : parseFloat(posKp),
         posMaxRpm: posMaxRpm === undefined ? undefined : parseFloat(posMaxRpm),
@@ -2391,8 +2467,12 @@ document.getElementById('importConfigBtn').addEventListener('click', async () =>
       if (cfg.omega !== undefined) await sendCommand('SET_OMEGA_N:' + Number(cfg.omega));
     }
     if (cfg.taud !== undefined) await sendCommand('SET_TAUD:' + Number(cfg.taud));
+    if (cfg.minTarget !== undefined || cfg.maxTarget !== undefined) {
+      if (!validLimits(cfg.minTarget, cfg.maxTarget)) throw new Error('Invalid position limits in backup.');
+      await sendCommand('SET_POS_LIMITS:' + cfg.minTarget + ',' + cfg.maxTarget);
+    }
     if (cfg.posKd !== undefined) await sendCommand('SET_POS_KD:' + Number(cfg.posKd));
-    if ([cfg.kp,cfg.ki,cfg.kff].every(Number.isFinite) && cfg.kff >= 0.0001) await sendCommand('SET_VEL_GAINS:' + [cfg.kp,cfg.ki,cfg.kff].join(','));
+    if ([cfg.kp,cfg.ki,cfg.kff].every(value => Number.isFinite(value) && Number.isFinite(Math.fround(value)))) await sendCommand('SET_VEL_GAINS:' + [cfg.kp,cfg.ki,cfg.kff].join(','));
     if (cfg.posKp !== undefined) await sendCommand('SET_POS_KP:' + Number(cfg.posKp));
     if (cfg.posMaxRpm !== undefined) await sendCommand('SET_POS_MAX_RPM:' + Number(cfg.posMaxRpm));
     const positionMinRpm = cfg.posMinRpm ?? cfg.positionMinRpm;
@@ -2474,6 +2554,11 @@ document.querySelectorAll('.save-tab-config-btn').forEach(button => {
     if (!writer) { setConfigActionStatus('Connect to the controller first.', true, section); return; }
     if (section === 'sensors') { void saveSensorSettings(); return; }
     if (tabConfigRequestPending) return;
+    if (activeLimits && (manualNumber('minTargetDeg') !== activeLimits.low ||
+                         manualNumber('maxTargetDeg') !== activeLimits.high)) {
+      applyPositionLimits(true);
+      return;
+    }
     tabConfigRequestPending = 'save-' + section;
     setConfigActionStatus('Saving ' + section + ' settings to flash...');
     sendCommand(section === 'sensors' ? 'SAVE_SENSOR_CONFIG' : 'SAVE_TUNING_CONFIG');
@@ -2854,7 +2939,7 @@ if (dual) {
 if (!dual) document.querySelectorAll('#page-can button, #page-can input, #page-can select').forEach(e => e.disabled = true);
 document.getElementById('canConfigStatus').textContent = dual ? 'Connect to read the board settings.' : 'CAN setup requires dual-motor CAN firmware.';
 panelAPI.navigate = page => goToPage(page);
-panelAPI.stop = () => sendCommand('STOP');
+panelAPI.stop = () => requestStop(motor);
 panelAPI.snapshot = () => ({active:isActive, connected:!!writer, velocity:latestVelocity, position:latestPosition.measured, fault:document.getElementById('sideFault').textContent});
 panelAPI.destroy = () => { timers.forEach(id => { globalThis.clearInterval(id); globalThis.clearTimeout(id); }); listeners.forEach(args=>globalThis.removeEventListener(...args)); };
 panelAPI.connected(false);
@@ -2869,6 +2954,16 @@ const $ = id => document.getElementById(id);
 let motorPanels = [];
 const panels = () => motorPanels;
 function message(text) { $('message').textContent = text || ''; $('message').parentElement.hidden = !text; }
+async function requestStop(motor = 0) {
+  const result = $('stopResult');
+  const scope = motor ? 'Motor ' + motor : (mode === 'dual' ? 'Both motors' : 'Motor 1');
+  result.textContent = scope + ' — stop requested…';
+  try {
+    await send(motor || 1, motor ? 'STOP' : 'STOP_ALL');
+  } catch (error) {
+    result.textContent = scope + ' — stop command failed. ' + error.message;
+  }
+}
 function state() {
   $('status').textContent = verified ? 'Connected • ' + (mode === 'dual' ? 'Dual motor board' : 'Single motor board') : port ? 'Checking firmware…' : 'Disconnected';
   $('connect').textContent = port ? 'Disconnect USB' : 'Connect USB';
@@ -2967,7 +3062,13 @@ function route(line) {
     panels().forEach(p => p?.receive(payload)); return;
   }
   if (!verified) return;
-  panels()[motor - 1]?.receive(payload);
+  if (payload === 'OK:STOPPED_ALL') {
+    panels().forEach(panel => panel.receive('OK:STOPPED'));
+    $('stopResult').textContent = 'Firmware confirmed Stop all.';
+  } else {
+    panels()[motor - 1]?.receive(payload);
+    if (payload === 'OK:STOPPED') $('stopResult').textContent = 'Firmware confirmed Stop for Motor ' + motor + '.';
+  }
   refreshHeaders();
 }
 async function read(activePort) {
@@ -3001,7 +3102,7 @@ async function disconnect() {
     if (writer) { writer.releaseLock(); writer = null; }
     if (activePort) await activePort.close().catch(() => {});
   }
-   finally { port = null; reading = null; closing = false; busy = false; state(); 
+   finally { $('stopResult').textContent = ''; port = null; reading = null; closing = false; busy = false; state(); 
 
    }
      console.warn('disconnect() called from:', new Error().stack);
@@ -3022,7 +3123,7 @@ async function toggle() {
 }
 window.motorBoard = {select, send, toggle, disconnect, navigate(page) { navigate(page); }, ready() { state(); }};
 $('connect').onclick = toggle;
-$('stop').onclick = () => send(1, 'STOP_ALL').catch(e => message(e.message));
+$('stop').onclick = () => requestStop();
 if (navigator.serial) navigator.serial.addEventListener('disconnect', e => { if (e.target === port || e.port === port) void disconnect(); });
 window.addEventListener('beforeunload', e => { if (port) { e.preventDefault(); e.returnValue = ''; } });
 
