@@ -509,6 +509,10 @@ button{font-family:inherit}
               <label for="canTxId">Feedback ID (TX)</label>
               <input type="text" id="canTxId" value="" placeholder="Waiting for board…" maxlength="5" inputmode="text" autocomplete="off" spellcheck="false">
             </div>
+            <div class="can-field">
+              <label for="canTuningId">Remote tuning ID (RX)</label>
+              <input type="text" id="canTuningId" value="" placeholder="Waiting for board…" maxlength="5" inputmode="text" autocomplete="off" spellcheck="false">
+            </div>
             </div>
           </div>
         </div>
@@ -1025,7 +1029,7 @@ let canConfigLoaded = false;
 function updateCanControls() {
   const connected = dual && motor === 1 && !!writer;
   const editable = connected && canConfigLoaded && !canConfigRequestPending;
-  for (const id of ['canBitrateButton','canBitrate','canRxId','canTxId','canOperationMode','canOperationModeButton','applyCanConfigBtn']) {
+  for (const id of ['canBitrateButton','canBitrate','canRxId','canTxId','canTuningId','canOperationMode','canOperationModeButton','applyCanConfigBtn']) {
     document.getElementById(id).disabled = !editable;
   }
   document.getElementById('readCanConfigBtn').disabled = !connected || !!canConfigRequestPending;
@@ -1035,7 +1039,7 @@ function resetCanConfig() {
   canConfigLoaded = false;
   canConfigRequestPending = null;
   setCanOperationMode('');
-  for (const id of ['canBitrate','canRxId','canTxId','canOperationMode']) document.getElementById(id).value = '';
+  for (const id of ['canBitrate','canRxId','canTxId','canTuningId','canOperationMode']) document.getElementById(id).value = '';
   document.getElementById('canBitrateLabel').textContent = 'Waiting for board…';
   document.querySelectorAll('#canBitrateMenu [data-value]').forEach(option => {
     option.classList.remove('selected'); option.setAttribute('aria-selected', 'false');
@@ -1243,21 +1247,23 @@ document.getElementById('applyCanConfigBtn').addEventListener('click', async () 
   const txRaw = document.getElementById('canTxId').value;
   const rxId = parseCanId(rxRaw);
   const txId = parseCanId(txRaw);
-  if (rxId === null || txId === null) {
+  const tuningId = parseCanId(document.getElementById('canTuningId').value);
+  if (rxId === null || txId === null || tuningId === null) {
     showCanConfigStatus('Enter each CAN ID as hexadecimal from 0x000 to 0x7FF.', 'error');
     return;
   }
-  if (rxId === txId) {
-    showCanConfigStatus('Choose different command and feedback IDs.', 'error');
+  if (new Set([rxId, txId, tuningId]).size !== 3) {
+    showCanConfigStatus('Choose different command, feedback and remote tuning IDs.', 'error');
     return;
   }
   const rxText = '0x' + rxId.toString(16).toUpperCase();
+  const tuningText = '0x' + tuningId.toString(16).toUpperCase();
   const txText = '0x' + txId.toString(16).toUpperCase();
   document.getElementById('canRxId').value = rxText;
   document.getElementById('canTxId').value = txText;
   canConfigRequestPending = 'apply';
   showCanConfigStatus('Applying and saving CAN settings…');
-  await sendCommand(`SET_AXIS_CAN:${bitrate},${rxText},${txText},${operationMode}`);
+  await sendCommand(`SET_AXIS_CAN:${bitrate},${rxText},${txText},${operationMode},${tuningText}`);
 });
 
 document.getElementById('homeBoard').textContent = 'Single Motor';
@@ -1597,21 +1603,27 @@ function handleLine(line) {
     const restored = canConfigRequestPending === 'restore';
     canConfigLoaded = false;
     canConfigRequestPending = null;
-    const [bitrateRaw, rxRaw, txRaw, modeRaw] = line.substring(11).split(',').map(value => value.trim());
+    const [bitrateRaw, rxRaw, txRaw, modeRaw, tuningRaw] = line.substring(11).split(',').map(value => value.trim());
     if (!['0','1','2','3'].includes(modeRaw)) {
       showCanConfigStatus('Firmware does not report the independent CAN mode. Install the matching standard-CAN firmware.', 'error'); return;
     }
     const bitrate = String(Number(bitrateRaw));
     const rxId = parseCanId(rxRaw || '');
+    if (tuningRaw === undefined) {
+      showCanConfigStatus('Install firmware with configurable remote tuning ID support.', 'error');
+      return;
+    }
+    const tuningId = parseCanId(tuningRaw);
     const txId = parseCanId(txRaw || '');
     const bitrateSelect = document.getElementById('canBitrate');
-    if (![...bitrateSelect.options].some(option => option.value === bitrate) || rxId === null || txId === null || rxId === txId) {
+    if (![...bitrateSelect.options].some(option => option.value === bitrate) || rxId === null || txId === null || tuningId === null || new Set([rxId, txId, tuningId]).size !== 3) {
       showCanConfigStatus('Controller returned invalid or unsupported CAN settings: ' + line, 'error');
       return;
     }
     if (!setCanBitrate(bitrate)) { showCanConfigStatus('Controller returned an unsupported bitrate.', 'error'); return; }
     document.getElementById('canRxId').value = '0x' + rxId.toString(16).toUpperCase();
     document.getElementById('canTxId').value = '0x' + txId.toString(16).toUpperCase();
+    document.getElementById('canTuningId').value = '0x' + tuningId.toString(16).toUpperCase();
     setCanOperationMode(modeRaw);
 
     canConfigLoaded = true;
@@ -1706,7 +1718,7 @@ function handleLine(line) {
   if (line === 'OK:VELOCITY_MODE') { setActiveControlMode('Velocity'); return; }
   if (line === 'OK:CAN_CONFIG') { canConfigRequestPending = 'saved-read'; showCanConfigStatus('CAN settings saved to flash. Reading back the active configuration…'); readCanConfig(); return; }
   if (line === 'ERR:CAN_BUSY_STOP') { canConfigRequestPending = null; showCanConfigStatus('Stop both motors before applying and saving CAN settings.', 'error'); return; }
-  if (line === 'ERR:BAD_CAN_CONFIG') { canConfigRequestPending = null; showCanConfigStatus('Use different standard RX and TX IDs from 0x000 to 0x7FF.', 'error'); return; }
+  if (line === 'ERR:BAD_CAN_CONFIG') { canConfigRequestPending = null; showCanConfigStatus('Use distinct standard command, feedback and remote tuning IDs from 0x000 to 0x7FF.', 'error'); return; }
   if (line === 'ERR:CAN_CONFIG_FAILED') { canConfigRequestPending = null; showCanConfigStatus('Applying or saving CAN settings failed. Read back the active settings before continuing.', 'error'); return; }
   if (line === 'ERR:UNKNOWN_CMD' && canConfigRequestPending) { canConfigRequestPending = null; showCanConfigStatus('This firmware does not support CAN settings over USB yet. Update the controller firmware with the CAN configuration handler.', 'error'); return; }
   if (line === 'OK:ZETA' || line === 'OK:OMEGA_N') { sendCommand('GET_CONFIG', true); cliEcho(line + ' — readback requested', 'rx'); return; }
